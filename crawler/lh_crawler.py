@@ -155,7 +155,7 @@ class LHDocumentFetcher:
 
         try:
             if suffix == ".pdf":
-                return await asyncio.to_thread(_extract_with_marker, tmp_path)
+                return await asyncio.to_thread(_extract_pdf, tmp_path)
             if suffix in (".hwp", ".hwpx"):
                 return await asyncio.to_thread(_extract_hwp, tmp_path)
             return ""
@@ -228,10 +228,11 @@ def _guess_suffix(url: str, content_type: str, content_disposition: str = "") ->
     return ".bin"
 
 
-def _extract_with_marker(path: Path) -> str:
-    """marker-pdf로 PDF를 마크다운으로 변환합니다.
+def _extract_pdf(path: Path) -> str:
+    """docling으로 PDF를 마크다운으로 변환합니다.
 
-    머리글/바닥글 제거·표 구조 보존·스캔본 OCR을 marker가 자동 처리합니다.
+    pdfium 백엔드로 한국어 공백을 올바르게 복원하고, 표 구조를 마크다운 테이블로 출력합니다.
+    스캔 페이지는 자동 OCR을 적용합니다.
     asyncio.to_thread()를 통해 이벤트 루프 블로킹 없이 호출하세요.
     """
     from crawler.pdf_converter import convert_pdf

@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     chroma_path: str = "./data/chroma"
     chroma_collection: str = "lh_regulations"
 
+    # 변환된 마크다운 캐시 경로
+    markdown_path: str = "./data/markdown"
+
     # 임베딩 모델
     embedding_model: str = "jhgan/ko-sroberta-multitask"
 
