@@ -13,6 +13,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from crawler.indexer import sync_from_rss
+from src.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +39,11 @@ if __name__ == "__main__":
     load_dotenv()
 
     parser = argparse.ArgumentParser(description="LH RSS 감시 데몬")
-    parser.add_argument("--url", required=True, help="LH 규정 RSS 피드 URL")
+    parser.add_argument(
+        "--url",
+        default=settings.lh_rss_url,
+        help="LH 규정 RSS 피드 URL (기본값: .env의 LH_RSS_URL)",
+    )
     parser.add_argument("--interval", type=int, default=3600, help="폴링 주기(초), 기본 3600")
     args = parser.parse_args()
 

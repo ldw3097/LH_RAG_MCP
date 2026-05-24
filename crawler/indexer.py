@@ -22,6 +22,50 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.config import settings
 from crawler.lh_crawler import LHDocumentFetcher, RssItem, parse_rss_feed
+from crawler.bm25_index import build_and_save
+
+_markdown_dir: Path | None = None
+
+
+def _get_markdown_dir() -> Path:
+    global _markdown_dir
+    if _markdown_dir is None:
+        _markdown_dir = Path(settings.markdown_path)
+        _markdown_dir.mkdir(parents=True, exist_ok=True)
+    return _markdown_dir
+
+
+def _save_markdown(title_key: str, pub_date: datetime, text: str) -> Path:
+    """변환된 마크다운을 data/markdown/{YYMMDD}_{title_key}.md 에 저장합니다.
+
+    같은 title_key의 기존 파일(날짜가 다른 구버전)을 먼저 삭제합니다.
+    """
+    md_dir = _get_markdown_dir()
+    for old in md_dir.glob(f"*_{title_key}.md"):
+        old.unlink()
+    date_str = pub_date.strftime("%y%m%d")
+    path = md_dir / f"{date_str}_{title_key}.md"
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
+_SKIP_SUFFIXES = ("예고", "안내문")
+_SKIP_PATTERNS = re.compile(
+    r"(일부개정|전부개정|개정안|개정\(안\)|규정\s*제\d+호|개정\s*시행)$"
+)
+
+
+def _should_skip(title: str) -> bool:
+    """다음 경우 인덱싱에서 제외합니다.
+    - 제목 끝이 '예고' 또는 '안내문'
+    - 개정안·개정(안)·일부개정·규정 제N호 공고 형식
+    """
+    t = title.strip()
+    if t.endswith(_SKIP_SUFFIXES):
+        return True
+    if _SKIP_PATTERNS.search(t):
+        return True
+    return False
 
 logger = logging.getLogger(__name__)
 
@@ -40,8 +84,13 @@ class SyncResult:
 # ── ID / 청크 유틸리티 ─────────────────────────────────────────────────────────
 
 def title_to_key(title: str) -> str:
-    """제목을 ChromaDB ID 접두어로 변환합니다 (최대 80자)."""
-    safe = re.sub(r"[^\w가-힣]", "_", title.strip())
+    """제목을 ChromaDB ID 접두어로 변환합니다 (최대 80자).
+
+    공백·특수문자를 제거(언더스코어 치환 아님)하여
+    '경영심의회운영규정'과 '경영심의회 운영규정'을 동일 키로 매핑합니다.
+    RSS 업데이트 시 제목 표기가 미세하게 바뀌어도 중복 저장을 방지합니다.
+    """
+    safe = re.sub(r"[^\w가-힣]", "", title.strip())
     return safe[:80]
 
 
@@ -180,19 +229,27 @@ def upsert_chunks(
 # ── 핵심 동기화 함수 ───────────────────────────────────────────────────────────
 
 async def _fetch_rss_items(rss_url: str) -> list[RssItem]:
-    async with httpx.AsyncClient(timeout=15.0) as client:
+    async with httpx.AsyncClient(
+        timeout=15.0,
+        verify=False,
+        headers={"User-Agent": "Mozilla/5.0 (compatible; LH-RAG-Bot/1.0)"},
+    ) as client:
         resp = await client.get(rss_url)
         resp.raise_for_status()
     return parse_rss_feed(resp.text)
 
 
-async def sync_from_rss(rss_url: str) -> SyncResult:
+async def sync_from_rss(
+    rss_url: str,
+    limit: int | None = None,
+) -> SyncResult:
     """RSS 피드를 기준으로 ChromaDB를 증분 동기화합니다.
 
     동작 방식:
     - RSS 항목의 title을 기본 키로 사용
     - 저장된 pub_date보다 RSS pub_date가 최신이면 청크 전체 교체
     - 동일하거나 오래된 경우 스킵
+    - limit: 처리할 최대 항목 수 (None이면 전체)
     """
     result = SyncResult()
 
@@ -207,50 +264,82 @@ async def sync_from_rss(rss_url: str) -> SyncResult:
         logger.warning("RSS 항목 없음")
         return result
 
-    logger.info("RSS 항목 %d건 수신", len(items))
+    if limit:
+        items = items[:limit]
+
+    # ── 사전 스캔: 처리 대상 분류 ─────────────────────────────────────────
     collection = get_collection()
+
+    class _Plan:
+        def __init__(self, item: RssItem, is_update: bool):
+            self.item = item
+            self.is_update = is_update
+
+    to_process: list[_Plan] = []
+    n_skip_filter = 0
+    n_skip_fresh = 0
+
+    for item in items:
+        if _should_skip(item.title):
+            n_skip_filter += 1
+            continue
+        key = title_to_key(item.title)
+        stored_date = get_stored_pub_date(collection, key)
+        if stored_date is not None and stored_date >= item.pub_date:
+            n_skip_fresh += 1
+            continue
+        to_process.append(_Plan(item, is_update=(stored_date is not None)))
+
+    n_new = sum(1 for p in to_process if not p.is_update)
+    n_upd = sum(1 for p in to_process if p.is_update)
+    print(
+        f"\n[인덱싱 계획]  전체 {len(items)}건"
+        f"  →  신규 {n_new}건  업데이트 {n_upd}건  "
+        f"스킵 {n_skip_fresh}건  제외(예고/안내문) {n_skip_filter}건\n"
+    )
+    result.skipped = n_skip_fresh + n_skip_filter
+
+    if not to_process:
+        logger.info("처리할 문서 없음 — 모두 최신 상태입니다.")
+        return result
+
+    # ── 처리 루프 ─────────────────────────────────────────────────────────
+    from tqdm import tqdm
+
     fetcher = LHDocumentFetcher()
-
     try:
-        for item in items:
-            key = title_to_key(item.title)
-            stored_date = get_stored_pub_date(collection, key)
+        pbar = tqdm(to_process, desc="인덱싱", unit="건", dynamic_ncols=True)
+        for plan in pbar:
+            item = plan.item
+            pbar.set_postfix_str(item.title[:30])
 
-            # ── 최신 여부 판단 ──────────────────────────────────────────────
-            if stored_date is not None and stored_date >= item.pub_date:
-                logger.debug("스킵 (이미 최신): %s (%s)", item.title, stored_date.date())
-                result.skipped += 1
-                continue
-
-            is_update = stored_date is not None
-            logger.info(
-                "%s: %s  저장=%s → RSS=%s",
-                "업데이트" if is_update else "신규",
-                item.title,
-                stored_date.date() if stored_date else "없음",
-                item.pub_date.date(),
-            )
-
-            # ── 문서 텍스트 수집 ────────────────────────────────────────────
             text = await fetcher.fetch_text(item.link)
             if not text:
                 logger.warning("텍스트 추출 실패, 스킵: %s", item.title)
                 result.failed += 1
                 continue
 
-            # ── 기존 청크 삭제 후 재삽입 ────────────────────────────────────
-            if is_update:
-                delete_existing_chunks(collection, item.title)
+            key = title_to_key(item.title)
+            _save_markdown(key, item.pub_date, text)
 
+            if plan.is_update:
+                delete_existing_chunks(collection, item.title)
             upsert_chunks(collection, item, chunk_text(text))
 
-            result.updated += 1 if is_update else 0
-            result.added += 0 if is_update else 1
+            result.updated += 1 if plan.is_update else 0
+            result.added += 0 if plan.is_update else 1
 
-            await asyncio.sleep(0.5)  # 서버 부하 방지
+            await asyncio.sleep(0.3)  # 서버 부하 방지
 
     finally:
         await fetcher.aclose()
+
+    # 신규·업데이트가 있을 때만 BM25 인덱스 재빌드
+    if result.added or result.updated:
+        logger.info("BM25 인덱스 재빌드 중...")
+        all_chunks = collection.get(include=["documents"])
+        build_and_save(all_chunks["ids"], all_chunks["documents"])
+        logger.info("BM25 인덱스 재빌드 완료")
 
     logger.info(
         "동기화 완료 — 신규: %d, 업데이트: %d, 스킵: %d, 실패: %d",

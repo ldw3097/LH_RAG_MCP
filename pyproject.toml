@@ -18,6 +18,9 @@ dependencies = [
     "pydantic-settings>=2.0.0",
     "tenacity>=8.0.0",
     "docling>=2.0.0",       # PDF 변환: 표 구조 + 자동 OCR (pdfium 백엔드로 한국어 공백 복원)
+    "python-dotenv>=1.0.0",
+    "kiwipiepy>=0.19.0",
+    "rank-bm25>=0.2.2",
 ]
 
 [project.optional-dependencies]
@@ -32,7 +35,7 @@ lh-rag-mcp = "src.server:main"
 lh-build-index = "scripts.build_index:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src", "scripts"]
+packages = ["src", "scripts", "crawler"]
 
 [tool.ruff]
 line-length = 100

@@ -24,13 +24,13 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s: %(mes
 logger = logging.getLogger(__name__)
 
 
-async def build(rss_url: str):
+async def build(rss_url: str, limit: int | None = None):
     if not rss_url:
         logger.error(
             "RSS URL이 없습니다. --rss 옵션 또는 .env의 LH_RSS_URL을 설정하세요."
         )
         sys.exit(1)
-    result = await sync_from_rss(rss_url)
+    result = await sync_from_rss(rss_url, limit=limit)
     logger.info(
         "완료 — 신규: %d, 업데이트: %d, 스킵: %d, 실패: %d",
         result.added, result.updated, result.skipped, result.failed,
@@ -47,8 +47,14 @@ def main():
         default=settings.lh_rss_url,
         help="LH 규정 RSS 피드 URL (기본값: .env의 LH_RSS_URL)",
     )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="처리할 최대 문서 수 (테스트용, 기본값: 전체)",
+    )
     args = parser.parse_args()
-    asyncio.run(build(args.rss))
+    asyncio.run(build(args.rss, limit=args.limit))
 
 
 if __name__ == "__main__":
