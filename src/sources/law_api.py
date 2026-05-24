@@ -13,8 +13,8 @@ logger = logging.getLogger(__name__)
 LAW_API_BASE = "https://www.law.go.kr/DRF"
 LAW_PORTAL_BASE = "https://www.law.go.kr"
 
-# 검색 결과 최대 개수 (법령 API 응답이 길어질 수 있으므로 제한)
-MAX_RESULTS = 5
+# 소스별 후보 수 (server.py에서 재랭킹 후 최종 10개로 축소)
+CANDIDATE_K = 15
 
 
 class LawApiSource(SearchSource):
@@ -28,19 +28,19 @@ class LawApiSource(SearchSource):
         results = await self._ai_search(query)
         if not results:
             results = await self._general_search(query)
-        return results[:MAX_RESULTS]
+        return results
 
     @retry(stop=stop_after_attempt(2), wait=wait_exponential(min=1, max=4))
     async def _ai_search(self, query: str) -> list[SearchResult]:
         """법제처 AI 자연어법령검색 API."""
         params = {
             "OC": law_oc_var.get() or settings.law_oc_default,
-            "target": "law",
+            "target": "aiSearch",
             "query": query,
             "type": "JSON",
-            "display": MAX_RESULTS,
+            "display": CANDIDATE_K,
         }
-        url = f"{LAW_API_BASE}/aiLawSearch.do?{urlencode(params)}"
+        url = f"{LAW_API_BASE}/lawSearch.do?{urlencode(params)}"
         try:
             resp = await self._client.get(url)
             resp.raise_for_status()
@@ -58,7 +58,7 @@ class LawApiSource(SearchSource):
             "target": "law",
             "query": query,
             "type": "JSON",
-            "display": MAX_RESULTS,
+            "display": CANDIDATE_K,
             "page": 1,
             "sort": "score",
         }
@@ -100,18 +100,24 @@ class LawApiSource(SearchSource):
             return ""
 
     def _parse_ai_results(self, data: dict) -> list[SearchResult]:
-        items = data.get("LawSearch", {}).get("law", [])
+        items = data.get("aiSearch", {}).get("법령조문", [])
         if isinstance(items, dict):
             items = [items]
         results = []
         for item in items:
-            law_name = item.get("법령명한글", "")
+            law_name = item.get("법령명", "")
             mst = item.get("법령일련번호", "")
-            article_no = item.get("조문번호", "")
-            content = item.get("조문내용", item.get("내용", ""))
+            article_no = item.get("조문번호", "").lstrip("0") or ""
+            article_title = item.get("조문제목", "")
+            content = item.get("조문내용", "")
             if not content:
                 content = f"{law_name} 관련 조문"
-            title = f"{law_name}" + (f" 제{article_no}조" if article_no else "")
+            title_parts = [law_name]
+            if article_no:
+                title_parts.append(f"제{article_no}조")
+                if article_title:
+                    title_parts.append(f"({article_title})")
+            title = " ".join(title_parts)
             url = f"{LAW_PORTAL_BASE}/법령/{law_name}" if law_name else ""
             results.append(SearchResult(
                 source_id=self.source_id,

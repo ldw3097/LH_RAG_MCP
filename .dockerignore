@@ -1,0 +1,11 @@
+.venv/
+data/
+references/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.env
+.git/
+.gitignore
+CLAUDE.md
+README.md

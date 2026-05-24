@@ -18,9 +18,9 @@ from crawler.bm25_index import BM25Store, load_bm25, bm25_search
 
 logger = logging.getLogger(__name__)
 
-TOP_K_DENSE = 20    # Dense 후보 수
-TOP_K_SPARSE = 20   # BM25 후보 수
-TOP_K_FINAL = 5     # 최종 반환 수
+TOP_K_DENSE = 30    # Dense 후보 수
+TOP_K_SPARSE = 30   # BM25 후보 수
+TOP_K_FINAL = 15    # 소스 후보 수 (server.py에서 재랭킹 후 최종 10개로 축소)
 RRF_K = 60          # RRF 평활화 상수 (논문 기본값)
 
 
