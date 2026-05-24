@@ -33,7 +33,7 @@ python -m src.server       # 또는 lh-rag-mcp
 | `src/sources/lh_vector.py` | ChromaDB 코사인 유사도 검색 |
 | `src/sources/base.py` | `BaseSource` 추상 클래스 |
 | `crawler/lh_crawler.py` | RSS 파싱 + LH 사이트 크롤링 + 파일 다운로드 |
-| `crawler/pdf_converter.py` | PDF 추출: pdftext 1차 / marker 폴백 |
+| `crawler/pdf_converter.py` | PDF 추출: docling (표 구조 + 자동 OCR) |
 | `crawler/indexer.py` | ChromaDB 증분 동기화 (title 기본키, pubDate 비교) |
 | `crawler/rss_watcher.py` | 주기적 RSS 감시 데몬 |
 
@@ -52,26 +52,32 @@ python -m src.server       # 또는 lh-rag-mcp
 
 ## PDF 변환: 가장 중요한 발견
 
-### 문제
-LH 규정은 HWP→PDF 변환 파일이다. PDF 내부에서 단어 간 공백이 글리프가 아닌 **절대 좌표 이동(`Tm` 연산자)**으로 표현된다. 글리프 스트림에는 `취업규칙을다음과같이` 처럼 공백 없이 들어있다.
+### 배경 (왜 marker를 쓰지 않는가)
+LH 규정은 HWP→PDF 변환 파일이다. 단어 간 공백이 글리프가 아닌 **절대 좌표 이동(`Tm` 연산자)**으로 표현된다.
 
-marker를 쓰면 내부적으로 pdftext로 읽은 텍스트를 span 단위로 join할 때 공백이 3개씩 생기고(`'취업규칙을   다음과'`), 이게 스캔 OCR 파손 패턴처럼 보여서 surya OCR 모델(`OCRErrorPredictor`)이 "bad" 판정 → **전체 OCR 파이프라인 구동 → 문서당 ~8분**.
+marker는 내부적으로 pdftext(pdfium)로 읽은 span들을 join할 때 공백이 3개씩 붙고(`'취업규칙을   다음과'`), surya의 `OCRErrorPredictor`가 이를 스캔 파손 패턴으로 판정 → **전체 OCR 파이프라인 구동 → 문서당 ~8분, 266개 = 35시간**.
 
-### 해결
-`pdftext`(pdfium 기반)를 직접 사용한다. pdfium은 인접 글자 bbox 간격을 분석해 공백을 올바르게 추론 → **0.3초, 공백 정상**.
+### 현재 방식: docling (단일)
+`docling`은 pdfium 백엔드(`pypdfium2`)를 사용해 한국어 공백을 올바르게 복원하고, 표 구조를 마크다운 테이블로 출력하며, 스캔 페이지는 자동 OCR 적용한다.
 
 ```python
 # crawler/pdf_converter.py
-# 1차: pdftext (0.3초) — 페이지당 80자 이상이면 사용
-# 폴백: marker OCR — 실제 스캔본일 때만
-_MIN_CHARS_PER_PAGE = 80
+# docling 단일 방식 — 폴백 없음
+# 디지털 PDF: pdfium 텍스트 + 표 구조화
+# 스캔 PDF:   자동 OCR
 ```
 
-**절대 marker를 1차로 되돌리지 말 것.** 266개 문서 기준 35시간 → 10분 차이다.
+| 방식 | 속도/문서 | 266개 전체 | 표 구조 | 스캔 PDF |
+|---|---|---|---|---|
+| marker (구) | ~8분 | ~35시간 | ✅ | ✅ |
+| pdftext (중간) | 0.3초 | ~1분 | ❌ | ❌ |
+| **docling (현재)** | **~16초** | **~72분** | **✅** | **✅** |
 
-### pymupdf(MuPDF)와 pdftext(pdfium) 차이
-- MuPDF: 글리프 스트림 순서대로 읽음, 좌표 gap 추론 안 함 → 공백 없는 텍스트
-- pdfium: 인접 글자 bbox 간격 분석 → 공백 올바르게 복원
+**marker로 되돌리지 말 것.** docling도 pdfium을 쓰므로 한국어 공백 문제가 없다.
+
+### 핵심: pdfium vs MuPDF 공백 처리 차이
+- **MuPDF** (pymupdf): 글리프 스트림 순서대로 읽음, 좌표 gap 추론 안 함 → 공백 없는 텍스트
+- **pdfium** (docling, pdftext): 인접 글자 bbox 간격 분석 → 공백 올바르게 복원
 
 ## ChromaDB 인덱스 구조
 
@@ -99,13 +105,14 @@ LAW_OC_DEFAULT=...        # 법제처 API 키 (없으면 사용자가 URL 파라
 MCP_API_KEY=...           # Bearer 인증 (비워두면 인증 없음)
 
 LH_RSS_URL=https://www.lh.or.kr/rss/board.es?mid=a10108020000&bid=0055
-TORCH_DEVICE=mps          # mps | cuda | cpu (marker 폴백 시에만 사용)
+TORCH_DEVICE=mps          # mps | cuda | cpu — docling 레이아웃/테이블 모델 가속
 EMBEDDING_MODEL=jhgan/ko-sroberta-multitask
 CHROMA_PATH=./data/chroma
 ```
 
 ## 알려진 제약
 
-- `TableRecEncoderDecoderModel` (surya 테이블 인식)은 MPS 미지원 → marker 폴백 시 CPU 동작
-- `marker/builders/line.py`의 `min_document_ocr_threshold = 0.85`는 정의만 있고 **실제로 사용되지 않는다** (dead config)
-- HWP 파일: LibreOffice 미설치 시 건너뜀
+- **docling 초기 로딩**: 레이아웃·테이블 모델 첫 로드 시 수십 초 소요 (이후 싱글턴 재사용)
+- **docling 속도**: 문서당 ~16초 (266개 인덱싱 시 ~72분). 인덱스는 증분 동기화라 이후 실행은 변경분만 처리
+- **HWP 파일**: LibreOffice 미설치 시 건너뜀
+- **SSL**: LH 사이트 인증서 체인 문제 → `httpx.AsyncClient(verify=False)` 처리 중

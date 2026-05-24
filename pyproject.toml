@@ -17,9 +17,7 @@ dependencies = [
     "beautifulsoup4>=4.12.0",
     "pydantic-settings>=2.0.0",
     "tenacity>=8.0.0",
-    "marker-pdf>=1.10.0",   # scanned PDF OCR 폴백용
-    "pdftext>=0.4.0",       # 디지털 PDF 고속 추출 (primary)
-    "pymupdf>=1.24.0",      # 페이지 수 조회 + 스캔 판별
+    "docling>=2.0.0",       # PDF 변환: 표 구조 + 자동 OCR (pdfium 백엔드로 한국어 공백 복원)
 ]
 
 [project.optional-dependencies]

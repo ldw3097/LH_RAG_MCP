@@ -130,7 +130,7 @@ src/
 
 crawler/
 ├── lh_crawler.py   # RSS 파싱 + 페이지 크롤링 + 파일 다운로드
-├── pdf_converter.py # PDF 텍스트 추출 (pdftext 1차 / marker 폴백)
+├── pdf_converter.py # PDF 텍스트 추출 (docling — 표 구조 + 자동 OCR)
 ├── indexer.py      # ChromaDB 증분 동기화 + 청킹
 └── rss_watcher.py  # 주기적 RSS 감시 데몬
 
@@ -148,12 +148,9 @@ scripts/
 
 ### PDF 변환 전략
 
-LH 규정 PDF는 HWP에서 변환된 파일입니다. 단어 사이 공백이 글리프가 아닌 좌표 이동(`Tm` 연산자)으로 표현되어 있어, 일반 PDF 파서가 공백 없는 텍스트를 반환합니다.
+LH 규정 PDF는 HWP에서 변환된 파일입니다. 단어 사이 공백이 글리프가 아닌 좌표 이동(`Tm` 연산자)으로 표현되어 있어, MuPDF 계열 파서는 공백 없는 텍스트를 반환합니다.
 
-- **1차: pdftext** (pdfium 기반) — 글자 bbox 간격을 분석해 공백을 올바르게 추론. 약 0.3초.
-- **폴백: marker** — 페이지당 텍스트 밀도가 80자 미만인 경우(실제 스캔본)에만 사용. surya OCR 모델 포함, 처음 실행 시 모델 로드에 수 분 소요.
-
-marker를 처음부터 사용하면 LH PDF 특성상 OCR 오류 감지 모델이 오작동해 불필요한 전체 OCR을 구동합니다(문서당 ~8분). 이 문제 때문에 pdftext를 1차로 사용합니다.
+**docling** (pdfium 백엔드)을 사용합니다. pdfium은 인접 글자 bbox 간격을 분석해 공백을 올바르게 복원하며, 표를 마크다운 테이블로 구조화하고, 스캔 페이지는 자동으로 OCR을 적용합니다. 문서당 약 16초 소요.
 
 ### 법제처 API 키
 
@@ -168,5 +165,5 @@ http://your-server.com/mcp?law_oc=USER_KEY
 ### 알려진 제약
 
 - **LH 사이트 SSL**: LH 웹사이트의 SSL 인증서 체인이 pyenv Python에서 검증 실패하는 문제로 `httpx.AsyncClient(verify=False)` 처리 중입니다.
-- **surya Table Recognition**: marker 폴백 시 테이블 인식 모델(`TableRecEncoderDecoderModel`)이 MPS 미지원으로 CPU에서 실행됩니다. Apple Silicon에서 marker를 사용하는 경우 테이블이 많은 문서는 느릴 수 있습니다.
+- **docling 초기 로딩**: 레이아웃·테이블 모델 최초 로드 시 수십 초 소요됩니다. 이후 실행은 싱글턴으로 재사용합니다.
 - **HWP 파일**: LibreOffice가 설치된 경우 HWP/HWPX 파일도 텍스트 추출이 가능합니다. 미설치 시 HWP 파일은 건너뜁니다.
