@@ -1,0 +1,44 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "lh-rag-mcp"
+version = "0.1.0"
+description = "LH 임직원용 법령·규정 RAG MCP 서버"
+requires-python = ">=3.11"
+dependencies = [
+    "fastmcp>=2.0.0",
+    "openai>=1.0.0",
+    "httpx>=0.27.0",
+    "chromadb>=0.5.0",
+    "sentence-transformers>=3.0.0",
+    "feedparser>=6.0.0",
+    "beautifulsoup4>=4.12.0",
+    "pydantic-settings>=2.0.0",
+    "tenacity>=8.0.0",
+    "marker-pdf>=1.10.0",   # scanned PDF OCR 폴백용
+    "pdftext>=0.4.0",       # 디지털 PDF 고속 추출 (primary)
+    "pymupdf>=1.24.0",      # 페이지 수 조회 + 스캔 판별
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "ruff>=0.4.0",
+]
+
+[project.scripts]
+lh-rag-mcp = "src.server:main"
+lh-build-index = "scripts.build_index:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src", "scripts"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
