@@ -9,8 +9,35 @@ from starlette.responses import JSONResponse
 from src.config import settings
 from src.context import law_oc_var
 from src.router import route
+from src.sources.base import SearchResult
 from src.sources.law_api import LawApiSource
 from src.sources.lh_vector import LHVectorSource
+
+FINAL_K = 10   # 재랭킹 후 Claude에게 넘길 최종 결과 수
+_RRF_K = 60
+
+SOURCE_LABELS = {
+    "law_api": "국가법령정보센터",
+    "lh_vector_db": "LH 규정",
+}
+
+
+def _rrf_rerank(source_results: dict[str, list[SearchResult]]) -> list[SearchResult]:
+    """소스별 결과를 RRF로 합산해 FINAL_K개 반환.
+
+    소스가 하나면 단순 슬라이스, 둘 이상이면 각 소스의 순위(position)를
+    RRF 점수로 변환해 합산 후 정렬한다.
+    """
+    if len(source_results) == 1:
+        return list(source_results.values())[0][:FINAL_K]
+
+    scored: list[tuple[float, SearchResult]] = []
+    for results in source_results.values():
+        for rank, r in enumerate(results):
+            scored.append((1.0 / (_RRF_K + rank + 1), r))
+
+    scored.sort(key=lambda x: x[0], reverse=True)
+    return [r for _, r in scored[:FINAL_K]]
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -54,28 +81,28 @@ async def search_lh_knowledge(query: str) -> str:
     }
     search_results = await asyncio.gather(*tasks.values(), return_exceptions=True)
 
-    # 3. 결과 통합
-    sections = []
+    # 3. 소스별 결과 수집
+    source_results: dict[str, list] = {}
     for sid, result in zip(tasks.keys(), search_results):
         if isinstance(result, Exception):
             logger.error("소스 %s 검색 오류: %s", sid, result)
             continue
-        if not result:
-            continue
-        source_label = {
-            "law_api": "국가법령정보센터",
-            "lh_vector_db": "LH 규정",
-        }.get(sid, sid)
-        section_lines = [f"=== {source_label} ==="]
-        for i, r in enumerate(result, 1):
-            section_lines.append(f"\n[{i}] {r.to_text()}")
-        sections.append("\n".join(section_lines))
+        if result:
+            source_results[sid] = result
 
-    if not sections:
+    if not source_results:
         return "관련 정보를 찾지 못했습니다. 다른 키워드로 다시 질문해 주세요."
 
-    header = f"검색어: {query}\n검색 소스: {', '.join(routing.sources)}\n"
-    return header + "\n\n".join(sections)
+    # 4. RRF 재랭킹 → 상위 FINAL_K개
+    reranked = _rrf_rerank(source_results)
+    logger.info("재랭킹 완료: %d개 결과 (소스: %s)", len(reranked), list(source_results.keys()))
+
+    # 5. 출력 포맷
+    lines = [f"검색어: {query}", f"검색 소스: {', '.join(source_results.keys())}", ""]
+    for i, r in enumerate(reranked, 1):
+        label = SOURCE_LABELS.get(r.source_id, r.source_id)
+        lines.append(f"[{i}] [{label}] {r.to_text()}")
+    return "\n".join(lines)
 
 
 class ApiKeyMiddleware(BaseHTTPMiddleware):

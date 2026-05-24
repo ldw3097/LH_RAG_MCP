@@ -28,3 +28,6 @@ class SearchSource(ABC):
     @abstractmethod
     async def search(self, query: str) -> list[SearchResult]:
         """키워드로 검색하여 관련 결과를 반환합니다."""
+
+    async def aclose(self) -> None:
+        """보유 리소스를 해제합니다. 필요한 서브클래스에서 오버라이드."""
