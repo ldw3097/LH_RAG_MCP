@@ -7,7 +7,9 @@ LH 규정 벡터DB 검색 소스 — Dense + BM25 하이브리드 (RRF 융합).
   3. RRF(k=60)로 두 랭킹을 합산, 상위 TOP_K_FINAL 반환
 """
 
+import asyncio
 import logging
+import threading
 
 import chromadb
 from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
@@ -49,10 +51,12 @@ class LHVectorSource(SearchSource):
         self._collection: chromadb.Collection | None = None
         self._embed_fn: SentenceTransformerEmbeddingFunction | None = None
         self._bm25: BM25Store | None = None
+        self._lock = threading.Lock()
 
     def _ensure_loaded(self):
-        if self._collection is not None:
-            return
+        with self._lock:
+            if self._collection is not None:
+                return
 
         self._embed_fn = SentenceTransformerEmbeddingFunction(
             model_name=settings.embedding_model,
@@ -80,7 +84,8 @@ class LHVectorSource(SearchSource):
             logger.warning("BM25 인덱스 없음 — Dense 전용 검색으로 동작합니다.")
 
     async def search(self, query: str) -> list[SearchResult]:
-        self._ensure_loaded()
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, self._ensure_loaded)
         if self._collection is None:
             return [SearchResult(
                 source_id=self.source_id,
@@ -89,10 +94,14 @@ class LHVectorSource(SearchSource):
             )]
 
         # ── 1. Dense 검색 ──────────────────────────────────────────────────
-        dense_result = self._collection.query(
-            query_texts=[query],
-            n_results=TOP_K_DENSE,
-            include=["documents", "metadatas", "distances"],
+        collection = self._collection
+        dense_result = await loop.run_in_executor(
+            None,
+            lambda: collection.query(
+                query_texts=[query],
+                n_results=TOP_K_DENSE,
+                include=["documents", "metadatas", "distances"],
+            ),
         )
         dense_ids: list[str] = dense_result["ids"][0]
         dense_docs: dict[str, str] = dict(
@@ -108,7 +117,10 @@ class LHVectorSource(SearchSource):
         # ── 2. BM25 검색 ───────────────────────────────────────────────────
         sparse_ids: list[str] = []
         if self._bm25:
-            sparse_hits = bm25_search(self._bm25, query, top_k=TOP_K_SPARSE)
+            bm25 = self._bm25
+            sparse_hits = await loop.run_in_executor(
+                None, lambda: bm25_search(bm25, query, top_k=TOP_K_SPARSE)
+            )
             sparse_ids = [cid for cid, _ in sparse_hits]
 
         # ── 3. RRF 융합 ────────────────────────────────────────────────────
@@ -117,8 +129,9 @@ class LHVectorSource(SearchSource):
         # ── 4. 청크 내용 조회 (BM25 전용 청크는 ChromaDB에서 추가 조회) ──
         missing = [cid for cid in fused_ids if cid not in dense_docs]
         if missing:
-            extra = self._collection.get(
-                ids=missing, include=["documents", "metadatas"]
+            extra = await loop.run_in_executor(
+                None,
+                lambda: collection.get(ids=missing, include=["documents", "metadatas"]),
             )
             for cid, doc, meta in zip(
                 extra["ids"], extra["documents"], extra["metadatas"]

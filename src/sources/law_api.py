@@ -21,7 +21,18 @@ class LawApiSource(SearchSource):
     source_id = "law_api"
 
     def __init__(self):
-        self._client = httpx.AsyncClient(timeout=15.0)
+        self._client = httpx.AsyncClient(
+            timeout=15.0,
+            headers={
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/120.0.0.0 Safari/537.36"
+                )
+            },
+            # stale 커넥션 풀 재사용 실패(RST) 시 자동 재시도
+            transport=httpx.AsyncHTTPTransport(retries=1),
+        )
 
     async def search(self, query: str) -> list[SearchResult]:
         # AI 자연어검색 우선, 실패하면 일반검색 fallback
