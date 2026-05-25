@@ -13,8 +13,7 @@ logger = logging.getLogger(__name__)
 LAW_API_BASE = "https://www.law.go.kr/DRF"
 LAW_PORTAL_BASE = "https://www.law.go.kr"
 
-# 소스별 후보 수 (server.py에서 재랭킹 후 최종 10개로 축소)
-CANDIDATE_K = 10
+CANDIDATE_K = 7
 
 
 class LawApiSource(SearchSource):

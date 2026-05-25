@@ -10,7 +10,6 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 RUN uv pip install --system --no-cache \
     "fastmcp>=2.0.0" \
-    "openai>=1.0.0" \
     "httpx>=0.27.0" \
     "pydantic-settings>=2.0.0" \
     "tenacity>=8.0.0" \
