@@ -36,7 +36,11 @@ class LawApiSource(SearchSource):
 
     async def search(self, query: str) -> list[SearchResult]:
         # AI 자연어검색 우선, 실패하면 일반검색 fallback
-        results = await self._ai_search(query)
+        try:
+            results = await self._ai_search(query)
+        except Exception as e:
+            logger.warning("AI 법령검색 실패 (%s), 일반검색으로 전환", e)
+            results = []
         if not results:
             results = await self._general_search(query)
         return results
@@ -52,14 +56,10 @@ class LawApiSource(SearchSource):
             "display": CANDIDATE_K,
         }
         url = f"{LAW_API_BASE}/lawSearch.do?{urlencode(params)}"
-        try:
-            resp = await self._client.get(url)
-            resp.raise_for_status()
-            data = resp.json()
-            return self._parse_ai_results(data)
-        except Exception as e:
-            logger.warning("AI 법령검색 실패 (%s), 일반검색으로 전환", e)
-            return []
+        resp = await self._client.get(url)
+        resp.raise_for_status()
+        data = resp.json()
+        return self._parse_ai_results(data)
 
     @retry(stop=stop_after_attempt(2), wait=wait_exponential(min=1, max=4))
     async def _general_search(self, query: str) -> list[SearchResult]:
