@@ -5,7 +5,6 @@ primary_region = 'nrt'  # Tokyo — 한국에서 가장 가까운 fly.io 리전
   dockerfile = 'Dockerfile'
 
 [env]
-  TORCH_DEVICE    = 'cpu'
   BM25_PATH       = '/data/bm25'
   MARKDOWN_PATH   = '/data/markdown'
   PORT            = '8000'
