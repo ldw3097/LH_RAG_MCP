@@ -5,13 +5,10 @@ primary_region = 'nrt'  # Tokyo — 한국에서 가장 가까운 fly.io 리전
   dockerfile = 'Dockerfile'
 
 [env]
-  TORCH_DEVICE    = 'cpu'
-  CHROMA_PATH     = '/data/chroma'
+  BM25_PATH       = '/data/bm25'
   MARKDOWN_PATH   = '/data/markdown'
   PORT            = '8000'
   HOST            = '0.0.0.0'
-  HF_HUB_OFFLINE       = '1'
-  TRANSFORMERS_OFFLINE  = '1'
 
 [http_service]
   internal_port = 8000
