@@ -14,7 +14,7 @@ from crawler.bm25_index import BM25Store, load_bm25, bm25_search
 
 logger = logging.getLogger(__name__)
 
-TOP_K_BM25 = 15    # BM25 후보 수 (server.py에서 재랭킹 후 최종 10개로 축소)
+TOP_K_BM25 = 10    # BM25 후보 수 (server.py에서 재랭킹 후 최종 10개로 축소)
 
 
 class LHVectorSource(SearchSource):

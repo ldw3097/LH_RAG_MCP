@@ -8,7 +8,6 @@ from starlette.responses import JSONResponse
 
 from src.config import settings
 from src.context import law_oc_var
-from src.router import route
 from src.sources.base import SearchResult
 from src.sources.law_api import LawApiSource
 from src.sources.lh_vector import LHVectorSource
@@ -69,19 +68,11 @@ async def search_lh_knowledge(query: str) -> str:
     """
     logger.info("검색 요청: %s", query)
 
-    # 1. 라우터: 소스 선정 + 소스별 키워드 추출 (단일 LLM 호출)
-    routing = await route(query)
-    logger.info("라우팅 결과: sources=%s", routing.sources)
-
-    # 2. 선정된 소스만 병렬 검색
-    tasks = {
-        sid: _sources[sid].search(routing.keywords[sid])
-        for sid in routing.sources
-        if sid in _sources
-    }
+    # 모든 소스를 동시에 검색
+    tasks = {sid: src.search(query) for sid, src in _sources.items()}
     search_results = await asyncio.gather(*tasks.values(), return_exceptions=True)
 
-    # 3. 소스별 결과 수집
+    # 소스별 결과 수집
     source_results: dict[str, list] = {}
     for sid, result in zip(tasks.keys(), search_results):
         if isinstance(result, Exception):
@@ -138,8 +129,6 @@ def main():
         logger.warning(
             "LAW_OC_DEFAULT 미설정 — 법령 API는 요청 URL의 ?law_oc= 파라미터가 필수입니다."
         )
-    if not settings.router_api_key:
-        logger.warning("ROUTER_API_KEY 미설정 — 라우터가 fallback(전체검색)으로 동작합니다.")
 
     # 첫 요청 전 BM25 인덱스·kiwipiepy 사전 로딩 (ML 모델 없음 — 수초 이내)
     logger.info("BM25 인덱스 사전 로딩 시작...")
