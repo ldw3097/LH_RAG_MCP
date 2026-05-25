@@ -44,6 +44,12 @@ def tokenize(text: str) -> list[str]:
     return tokens or text.split()
 
 
+def warmup_kiwi() -> None:
+    """Kiwi 형태소 분석기를 미리 초기화합니다 (첫 검색 지연 방지)."""
+    _get_kiwi()
+    logger.info("Kiwi 사전 초기화 완료")
+
+
 class BM25Store(NamedTuple):
     ids: list[str]         # chunk ID 목록 (title_key__cNNNN)
     corpus: list[str]      # 원문 청크 텍스트

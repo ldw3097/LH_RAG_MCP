@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     lh_regulations_url: str = "https://www.lh.or.kr/board.es?mid=a10108020000&bid=0055"
     lh_rss_url: str = ""
 
-    # PDF 변환 (marker)
+    # PDF 변환 (docling)
     torch_device: str = "mps"   # mps | cuda | cpu
 
     # MCP 서버 인증

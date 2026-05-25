@@ -1,16 +1,11 @@
-"""
-LH 규정 검색 소스 — BM25 스파스 검색 전용 (kiwipiepy 형태소 분석).
-
-BM25Store(pkl 파일)가 검색 인덱스와 메타데이터(title, url 등)를 모두 담습니다.
-ChromaDB, SentenceTransformer 등 ML 라이브러리 의존성이 없습니다.
-"""
+"""LH 규정 검색 소스 — BM25(kiwipiepy) 검색."""
 
 import asyncio
 import logging
 import threading
 
 from src.sources.base import SearchResult, SearchSource
-from crawler.bm25_index import BM25Store, load_bm25, bm25_search
+from crawler.bm25_index import BM25Store, load_bm25, bm25_search, warmup_kiwi
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +29,7 @@ class LHVectorSource(SearchSource):
             if self._bm25:
                 self._id_to_idx = {cid: i for i, cid in enumerate(self._bm25.ids)}
                 logger.info("BM25 인덱스 로드 완료: %d청크", len(self._bm25.ids))
+                warmup_kiwi()
             else:
                 logger.warning("BM25 인덱스 없음 — build_index.py를 먼저 실행하세요.")
             self._loaded = True
