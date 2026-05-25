@@ -115,6 +115,21 @@ def get_stored_pub_date(store: BM25Store | None, title_key: str) -> datetime | N
     return None
 
 
+def get_all_title_keys(store: BM25Store | None) -> dict[str, datetime]:
+    """저장된 모든 title_key → pub_date 매핑을 반환합니다."""
+    if store is None:
+        return {}
+    result: dict[str, datetime] = {}
+    for i, cid in enumerate(store.ids):
+        # chunk ID: {title_key}__c{idx:04d}
+        key = cid.rsplit("__c", 1)[0]
+        if key not in result:
+            pub = store.metadatas[i].get("pub_date", "")
+            if pub:
+                result[key] = datetime.fromisoformat(pub)
+    return result
+
+
 def remove_doc_chunks(
     ids: list[str],
     corpus: list[str],

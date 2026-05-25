@@ -88,7 +88,18 @@ class LHDocumentFetcher:
         )
 
     async def fetch_text(self, page_url: str) -> str:
-        """게시글 URL → 첨부파일 탐색 → 텍스트 추출."""
+        """게시글 URL → 첨부파일 탐색 → 텍스트 추출.
+
+        1순위: board URL에서 직접 다운로드 URL 유도 (페이지 파싱 생략)
+        2순위: HTML 파싱으로 첨부파일 링크 탐색 (폴백)
+        """
+        direct_url = _derive_download_url(page_url)
+        if direct_url:
+            text = await self._download_and_extract(direct_url)
+            if text:
+                return text
+            logger.debug("직접 다운로드 실패, HTML 파싱 폴백: %s", page_url)
+
         try:
             resp = await self._client.get(page_url)
             resp.raise_for_status()
@@ -170,6 +181,23 @@ class LHDocumentFetcher:
 
 def _abs_url(href: str) -> str:
     return href if href.startswith("http") else BASE_URL + href
+
+
+def _derive_download_url(page_url: str) -> str | None:
+    """board.es URL에서 boardDownload.es URL을 직접 유도합니다.
+
+    board.es?...&bid=X&list_no=Y&... → boardDownload.es?bid=X&list_no=Y&seq=1
+    """
+    from urllib.parse import parse_qs, urlparse
+    parsed = urlparse(page_url)
+    if "board.es" not in parsed.path:
+        return None
+    qs = parse_qs(parsed.query)
+    bid = (qs.get("bid") or [None])[0]
+    list_no = (qs.get("list_no") or [None])[0]
+    if not (bid and list_no):
+        return None
+    return f"{BASE_URL}/boardDownload.es?bid={bid}&list_no={list_no}&seq=1"
 
 
 def _guess_suffix(url: str, content_type: str, content_disposition: str = "") -> str:

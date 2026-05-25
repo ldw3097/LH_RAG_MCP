@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     # PDF 변환 (docling)
     torch_device: str = "mps"   # mps | cuda | cpu
 
+    # Dense 임베딩 (DeepInfra API)
+    deepinfra_api_key: str = ""
+    embedding_model: str = "Qwen/Qwen3-Embedding-0.6B"
+
     # MCP 서버 인증
     mcp_api_key: str = ""
     host: str = "0.0.0.0"

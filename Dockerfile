@@ -15,10 +15,12 @@ RUN uv pip install --system --no-cache \
     "tenacity>=8.0.0" \
     "python-dotenv>=1.0.0" \
     "kiwipiepy>=0.19.0" \
-    "rank-bm25>=0.2.2"
+    "rank-bm25>=0.2.2" \
+    "numpy>=1.24.0"
 
 COPY src/ src/
 COPY crawler/bm25_index.py crawler/bm25_index.py
+COPY crawler/dense_index.py crawler/dense_index.py
 
 RUN mkdir -p /data/bm25 /data/markdown
 
