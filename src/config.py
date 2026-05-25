@@ -12,15 +12,12 @@ class Settings(BaseSettings):
     # 법제처 API 키: 서버 기본값 (없으면 요청별 URL 파라미터 law_oc 필수)
     law_oc_default: str = ""
 
-    # ChromaDB
-    chroma_path: str = "./data/chroma"
-    chroma_collection: str = "lh_regulations"
+    # BM25 인덱스
+    bm25_path: str = "./data/bm25"
+    bm25_collection: str = "lh_regulations"
 
     # 변환된 마크다운 캐시 경로
     markdown_path: str = "./data/markdown"
-
-    # 임베딩 모델
-    embedding_model: str = "jhgan/ko-sroberta-multitask"
 
     # LH 크롤링
     lh_regulations_url: str = "https://www.lh.or.kr/board.es?mid=a10108020000&bid=0055"
