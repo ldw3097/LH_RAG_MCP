@@ -161,6 +161,62 @@ def _split_fixed(text: str) -> list[str]:
     return chunks
 
 
+# ── 마크다운 캐시에서 직접 빌드 ───────────────────────────────────────────────
+
+def build_from_markdown(markdown_dir: Path | None = None) -> SyncResult:
+    """data/markdown/ 의 캐시 파일로 BM25 인덱스를 재빌드합니다.
+
+    LH 사이트 접속 없이 기존 마크다운 캐시만으로 빠르게 인덱스를 재구성합니다.
+    파일명 형식: {YYMMDD}_{title_key}.md
+    """
+    from tqdm import tqdm
+
+    md_dir = markdown_dir or Path(settings.markdown_path)
+    md_files = sorted(md_dir.glob("*.md"))
+    if not md_files:
+        logger.error("마크다운 파일 없음: %s", md_dir)
+        return SyncResult()
+
+    all_ids: list[str] = []
+    all_corpus: list[str] = []
+    all_metadatas: list[dict] = []
+
+    for md_file in tqdm(md_files, desc="마크다운 인덱싱", unit="건", dynamic_ncols=True):
+        # 파일명 파싱: "260428_취업규칙.md" → date_str="260428", title_key="취업규칙"
+        stem = md_file.stem
+        parts = stem.split("_", 1)
+        if len(parts) != 2:
+            logger.warning("파일명 형식 불일치, 스킵: %s", md_file.name)
+            continue
+        date_str, title_key = parts
+        try:
+            pub_date = datetime.strptime(date_str, "%y%m%d")
+        except ValueError:
+            logger.warning("날짜 파싱 실패, 스킵: %s", md_file.name)
+            continue
+
+        text = md_file.read_text(encoding="utf-8")
+        chunks = chunk_text(text)
+        n = len(chunks)
+        pub_date_iso = pub_date.isoformat()
+
+        for i, chunk in enumerate(chunks):
+            all_ids.append(chunk_id(title_key, i))
+            all_corpus.append(chunk)
+            all_metadatas.append({
+                "title": title_key,
+                "url": "",
+                "pub_date": pub_date_iso,
+                "chunk_index": i,
+                "total_chunks": n,
+            })
+
+    logger.info("BM25 인덱스 빌드 중... (%d청크, %d문서)", len(all_ids), len(md_files))
+    build_and_save(all_ids, all_corpus, all_metadatas)
+    logger.info("BM25 인덱스 빌드 완료")
+    return SyncResult(added=len(md_files))
+
+
 # ── 핵심 동기화 함수 ───────────────────────────────────────────────────────────
 
 async def _fetch_rss_items(rss_url: str) -> list[RssItem]:
