@@ -141,10 +141,10 @@ def main():
     if not settings.router_api_key:
         logger.warning("ROUTER_API_KEY 미설정 — 라우터가 fallback(전체검색)으로 동작합니다.")
 
-    # 첫 요청 대기 없이 즉시 서빙하도록 벡터 DB를 사전 로딩
-    logger.info("벡터DB 사전 로딩 시작...")
+    # 첫 요청 전 BM25 인덱스·kiwipiepy 사전 로딩 (ML 모델 없음 — 수초 이내)
+    logger.info("BM25 인덱스 사전 로딩 시작...")
     _sources["lh_vector_db"]._ensure_loaded()
-    logger.info("벡터DB 사전 로딩 완료")
+    logger.info("BM25 인덱스 사전 로딩 완료")
 
     app = mcp.http_app(transport="streamable-http")
     # 미들웨어는 역순으로 실행되므로 LawOc → ApiKey 순으로 등록
