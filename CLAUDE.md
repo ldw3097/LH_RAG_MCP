@@ -25,7 +25,7 @@ python -m src.server            # MCP 서버 실행 (또는 lh-rag-mcp)
 
 | 파일 | 역할 |
 |---|---|
-| `src/server.py` | FastMCP 앱, 미들웨어, `search_lh_knowledge` 툴 |
+| `src/server.py` | FastMCP 앱, 미들웨어, `search_law` / `search_lh_regulations` 툴 |
 | `src/config.py` | 환경변수 (pydantic-settings) |
 | `src/context.py` | `law_oc_var` — 요청별 법제처 API 키 격리 (contextvars) |
 | `src/sources/law_api.py` | 법제처 AI검색 → 일반검색 fallback, 결과 7개 |
@@ -41,7 +41,7 @@ python -m src.server            # MCP 서버 실행 (또는 lh-rag-mcp)
 ## 새 소스 추가
 
 1. `src/sources/` 에 `SearchSource` 상속 클래스 작성
-2. `src/server.py` `_sources` 딕셔너리에 인스턴스 추가
+2. `src/server.py` 에 `@mcp.tool()` 데코레이터로 새 툴 함수 추가
 
 ## 환경변수 (.env)
 

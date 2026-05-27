@@ -1,4 +1,3 @@
-import asyncio
 import logging
 
 from fastmcp import FastMCP
@@ -24,56 +23,70 @@ mcp = FastMCP(
     name="LH RAG MCP",
     instructions=(
         "LH 임직원 업무 지원 서버입니다. "
-        "법령, LH 내부 규정·지침에 관한 질문을 search_lh_knowledge 도구로 검색하세요."
+        "법률·시행령·판례 등 국가법령은 search_law 도구로, "
+        "LH 내부 규정·지침은 search_lh_regulations 도구로 검색하세요."
     ),
 )
 
-_sources = {
-    "law_api": LawApiSource(),
-    "lh_vector_db": LHVectorSource(),
-}
+_law_source = LawApiSource()
+_lh_source = LHVectorSource()
+
+
+def _format_results(query: str, source_label: str, results: list[SearchResult]) -> str:
+    """검색 결과를 텍스트로 포맷합니다."""
+    lines = [f"검색어: {query}", f"검색 소스: {source_label}", ""]
+    for i, r in enumerate(results, 1):
+        label = SOURCE_LABELS.get(r.source_id, r.source_id)
+        lines.append(f"[{i}] [{label}] {r.to_text()}")
+    return "\n".join(lines)
 
 
 @mcp.tool()
-async def search_lh_knowledge(query: str) -> str:
+async def search_law(query: str) -> str:
     """
-    질문과 관련된 법령, 판례, LH 규정 등을 통합 검색합니다.
+    국가법령정보센터에서 법령·시행령·시행규칙·판례·행정규칙을 검색합니다.
 
-    국가법령정보센터(법령·시행령·판례·행정규칙)와 LH 내부 규정집을 검색하여
-    관련 정보를 반환합니다.
+    법률 조항, 시행령, 판례, 고시·훈령 등 국가 공식 법령 정보를 찾을 때 사용하세요.
 
     Args:
         query: 사용자의 요약된 질의 내용
     """
-    logger.info("검색 요청: %s", query)
+    logger.info("[법령 검색] %s", query)
+    try:
+        results = await _law_source.search(query)
+    except Exception as e:
+        logger.error("법령 검색 오류: %s", e)
+        return "법령 검색 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
 
-    # 모든 소스를 동시에 검색
-    tasks = {sid: src.search(query) for sid, src in _sources.items()}
-    search_results = await asyncio.gather(*tasks.values(), return_exceptions=True)
+    if not results:
+        return "관련 법령을 찾지 못했습니다. 다른 키워드로 다시 질문해 주세요."
 
-    # 소스별 결과 수집
-    source_results: dict[str, list] = {}
-    for sid, result in zip(tasks.keys(), search_results):
-        if isinstance(result, Exception):
-            logger.error("소스 %s 검색 오류: %s", sid, result)
-            continue
-        if result:
-            source_results[sid] = result
+    logger.info("[법령 검색] 완료: %d개 결과", len(results))
+    return _format_results(query, SOURCE_LABELS["law_api"], results)
 
-    if not source_results:
-        return "관련 정보를 찾지 못했습니다. 다른 키워드로 다시 질문해 주세요."
 
-    # 소스별 결과를 순서대로 이어붙임 (law_api → lh_vector_db)
-    merged: list[SearchResult] = []
-    for results in source_results.values():
-        merged.extend(results)
-    logger.info("검색 완료: %d개 결과 (소스: %s)", len(merged), list(source_results.keys()))
+@mcp.tool()
+async def search_lh_regulations(query: str) -> str:
+    """
+    LH 내부 규정집(규정·시행세칙·지침)을 검색합니다.
 
-    lines = [f"검색어: {query}", f"검색 소스: {', '.join(source_results.keys())}", ""]
-    for i, r in enumerate(merged, 1):
-        label = SOURCE_LABELS.get(r.source_id, r.source_id)
-        lines.append(f"[{i}] [{label}] {r.to_text()}")
-    return "\n".join(lines)
+    LH 사규, 업무 처리 기준, 내부 지침 등 LH 고유 규정 정보를 찾을 때 사용하세요.
+
+    Args:
+        query: 사용자의 요약된 질의 내용
+    """
+    logger.info("[LH 규정 검색] %s", query)
+    try:
+        results = await _lh_source.search(query)
+    except Exception as e:
+        logger.error("LH 규정 검색 오류: %s", e)
+        return "LH 규정 검색 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
+
+    if not results:
+        return "관련 LH 규정을 찾지 못했습니다. 다른 키워드로 다시 질문해 주세요."
+
+    logger.info("[LH 규정 검색] 완료: %d개 결과", len(results))
+    return _format_results(query, SOURCE_LABELS["lh_vector_db"], results)
 
 
 class ApiKeyMiddleware(BaseHTTPMiddleware):
@@ -112,7 +125,7 @@ def main():
 
     # 첫 요청 전 BM25 인덱스·kiwipiepy 사전 로딩 (ML 모델 없음 — 수초 이내)
     logger.info("BM25 인덱스 사전 로딩 시작...")
-    _sources["lh_vector_db"]._ensure_loaded()
+    _lh_source._ensure_loaded()
     logger.info("BM25 인덱스 사전 로딩 완료")
 
     app = mcp.http_app(transport="streamable-http")
