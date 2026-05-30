@@ -1,0 +1,35 @@
+name: Fly.io machine schedule
+
+on:
+  schedule:
+    - cron: '50 23 * * 1-5'  # KST 08:50 (UTC 23:50 전날) 평일 — 머신 1개 유지
+    - cron: '0 9 * * 1-5'  # KST 18:00 (UTC 09:00) 평일 — 머신 0개 (auto_stop)
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'scale-up or scale-down'
+        required: true
+        type: choice
+        options: [scale-up, scale-down]
+
+jobs:
+  schedule:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Scale up (min 1)
+        if: |
+          github.event_name == 'workflow_dispatch' && inputs.action == 'scale-up' ||
+          github.event_name == 'schedule' && startsWith(github.event.schedule, '50 23')
+        run: flyctl scale count 1 --app lh-rag-mcp --yes
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      - name: Scale down (min 0, auto_stop)
+        if: |
+          github.event_name == 'workflow_dispatch' && inputs.action == 'scale-down' ||
+          github.event_name == 'schedule' && startsWith(github.event.schedule, '0 9')
+        run: flyctl scale count 0 --app lh-rag-mcp --yes
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
