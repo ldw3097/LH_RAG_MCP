@@ -29,6 +29,10 @@ class Settings(BaseSettings):
     kcsc_data_path: str = "./data/kcsc"
     kcsc_bm25_collection: str = "kcsc_standards"
 
+    # 조달청 해석사례 (법제처 OPEN API ppsCgmExpc — 인증키는 law_oc_default 재사용)
+    pps_data_path: str = "./data/pps"
+    pps_bm25_collection: str = "pps_interpretations"
+
     # MCP 서버 인증
     mcp_api_key: str = ""
     host: str = "0.0.0.0"
