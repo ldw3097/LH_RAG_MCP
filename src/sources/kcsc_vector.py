@@ -10,7 +10,7 @@ import logging
 import threading
 
 from src.sources.base import SearchResult, SearchSource
-from src.sources.lh_vector import _rrf, TOP_K_CANDIDATES, TOP_K_FINAL
+from src.sources.lh_vector import _rrf, TOP_K_CANDIDATES
 from src.config import settings
 from crawler.bm25_index import BM25Store, load_bm25, bm25_search, warmup_kiwi
 from crawler.dense_index import DenseStore, load_dense, embed_query, dense_search
@@ -18,7 +18,8 @@ from crawler.kcsc_indexer import KcscGraph, load_graph
 
 logger = logging.getLogger(__name__)
 
-MAX_CITATION_HOPS = 3   # 1-hop 확장으로 추가할 최대 청크 수
+KCSC_TOP_K_PRIMARY = 5   # 1차 하이브리드 검색 반환 수
+MAX_CITATION_HOPS = 10   # 1-hop 인용 확장 최대 청크 수
 
 
 class KCSCVectorSource(SearchSource):
@@ -190,9 +191,9 @@ class KCSCVectorSource(SearchSource):
         bm25_hits, dense_hits = await asyncio.gather(bm25_task, dense_task)
 
         if dense_hits:
-            top_ids = _rrf(bm25_hits, dense_hits)
+            top_ids = _rrf(bm25_hits, dense_hits, top_n=KCSC_TOP_K_PRIMARY)
         else:
-            top_ids = [cid for cid, _ in bm25_hits[:TOP_K_FINAL]]
+            top_ids = [cid for cid, _ in bm25_hits[:KCSC_TOP_K_PRIMARY]]
 
         output: list[SearchResult] = []
         for cid in top_ids:
