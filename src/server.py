@@ -97,8 +97,15 @@ async def search_lh_regulations(query: str, keywords: str) -> str:
     return await _search_single("lh_vector_db", query, keywords)
 
 
+_CATEGORY_MAP: dict[str, set[str] | None] = {
+    "design":       {"KDS"},
+    "construction": {"KCS", "LHCS"},
+    "all":          None,
+}
+
+
 @mcp.tool()
-async def search_construction_standards(query: str, keywords: str) -> str:
+async def search_construction_standards(query: str, keywords: str, category: str = "all") -> str:
     """
     건설기준(KDS·KCS·LHCS)을 검색합니다.
 
@@ -113,8 +120,26 @@ async def search_construction_standards(query: str, keywords: str) -> str:
     Args:
         query: 자연어로 요약한 질의 (예: "옹벽 설계 시 토압 산정 방법").
         keywords: 핵심 키워드를 공백으로 구분 (예: "옹벽 토압 안정성 설계").
+        category: 검색 범위.
+            "design"       — KDS(설계기준)만. 구조 계산·하중·안전율·설계 공식 등 설계 단계 질문.
+            "construction" — KCS(표준시방서)·LHCS(LH 전문시방서)만. 공법·재료·품질관리·시공 절차 질문.
+            "all"          — 전체 검색 (기본값). 설계·시공 경계가 불분명하거나 둘 다 필요한 경우.
     """
-    return await _search_single("kcsc_vector_db", query, keywords)
+    code_types = _CATEGORY_MAP.get(category)
+    logger.info("검색 요청 [kcsc_vector_db]: query=%s | keywords=%s | category=%s", query, keywords, category)
+    try:
+        results = await _sources["kcsc_vector_db"].search(query, keywords, code_types=code_types)
+    except Exception as e:
+        logger.error("소스 kcsc_vector_db 검색 오류: %s", e)
+        return "검색 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
+    if not results:
+        return "관련 정보를 찾지 못했습니다. 다른 키워드로 다시 질문해 주세요."
+    label = SOURCE_LABELS["kcsc_vector_db"]
+    logger.info("검색 완료 [kcsc_vector_db]: %d개 결과", len(results))
+    lines = [f"검색어: {query}", f"키워드: {keywords}", f"검색 소스: {label}", ""]
+    for i, r in enumerate(results, 1):
+        lines.append(f"[{i}] [{label}] {r.to_text()}")
+    return "\n".join(lines)
 
 
 @mcp.tool()
