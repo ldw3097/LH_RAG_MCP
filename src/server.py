@@ -11,12 +11,14 @@ from src.sources.law_api import LawApiSource
 from src.sources.lh_vector import LHVectorSource
 from src.sources.kcsc_vector import KCSCVectorSource
 from src.sources.prec_api import PrecedentSource
+from src.sources.pps_vector import PpsVectorSource
 
 SOURCE_LABELS = {
     "law_api": "국가법령정보센터",
     "lh_vector_db": "LH 규정",
     "kcsc_vector_db": "건설기준(KDS/KCS/LHCS)",
     "prec": "법원 판례",
+    "pps_vector_db": "조달청 해석사례",
 }
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -32,6 +34,8 @@ mcp = FastMCP(
         "법원 판례는 search_precedents 도구로 키워드 검색하세요. "
         "건설기준(KDS 설계기준·KCS 표준시방서·LHCS LH 전문시방서)은 "
         "search_construction_standards 도구로 검색하세요. "
+        "조달청 계약법규 해석사례(국가계약법규 유권해석)는 "
+        "search_procurement_interpretations 도구로 검색하세요. "
         "검색 도구는 자연어 질의(query)와 핵심 키워드(keywords)를 함께 전달하세요. "
         "질문이 여러 영역에 걸쳐 있으면 해당 도구들을 모두 호출하세요."
     ),
@@ -42,6 +46,7 @@ _sources = {
     "lh_vector_db": LHVectorSource(),
     "kcsc_vector_db": KCSCVectorSource(),
     "prec": PrecedentSource(),
+    "pps_vector_db": PpsVectorSource(),
 }
 
 
@@ -172,6 +177,22 @@ async def search_precedents(keywords: str) -> str:
     return "\n".join(lines)
 
 
+@mcp.tool()
+async def search_procurement_interpretations(query: str, keywords: str) -> str:
+    """
+    조달청 계약법규 해석사례(유권해석)를 검색합니다.
+
+    국가계약법·지방계약법·계약예규 등 국가계약법규에 대한 조달청의 유권해석 사례를
+    질의요지·회답 본문까지 의미검색해 반환합니다. 입찰·낙찰자 선정, 계약 체결·관리,
+    물가변동/설계변경에 따른 계약금액 조정, 지체상금, 하자담보 등 조달 업무 관련 질문에 사용하세요.
+
+    Args:
+        query: 자연어로 요약한 질의 (예: "물가가 올라 계약금액을 조정받을 수 있는지").
+        keywords: 핵심 키워드를 공백으로 구분 (예: "물가변동 계약금액 조정").
+    """
+    return await _search_single("pps_vector_db", query, keywords)
+
+
 class ApiKeyMiddleware(BaseHTTPMiddleware):
     """Bearer 토큰으로 MCP 서버 접근을 제한합니다."""
 
@@ -210,6 +231,7 @@ def main():
     logger.info("BM25 인덱스 사전 로딩 시작...")
     _sources["lh_vector_db"]._ensure_loaded()
     _sources["kcsc_vector_db"]._ensure_loaded()
+    _sources["pps_vector_db"]._ensure_loaded()
     logger.info("BM25 인덱스 사전 로딩 완료")
 
     app = mcp.http_app(transport="streamable-http")

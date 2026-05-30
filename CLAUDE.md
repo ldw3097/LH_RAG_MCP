@@ -19,6 +19,11 @@ python scripts/build_kcsc_index.py --type KCS --limit 5
 python scripts/build_kcsc_index.py --type LHCS --limit 5
 python scripts/build_kcsc_index.py --from-cache   # 인덱스만 재빌드
 
+# 조달청 해석사례 인덱스 빌드 (최초 1회, 864건 ~수분)
+python scripts/build_pps_index.py
+python scripts/build_pps_index.py --limit 20      # 테스트
+python scripts/build_pps_index.py --from-cache    # 인덱스만 재빌드
+
 python -m src.server                 # MCP 서버 실행 (또는 lh-rag-mcp)
 ```
 
@@ -29,9 +34,10 @@ search_law(query, keywords)                   → 법제처 AI검색(법령) + a
 search_lh_regulations(query, keywords)        → LH 규정 BM25(keywords)+Dense(query) RRF       → Claude
 search_construction_standards(query,keywords) → KCSC 건설기준 BM25+Dense RRF + 인용그래프 1-hop → Claude
 search_precedents(keywords)                   → 법제처 판례검색(prec) 상위 N건 요지 조회        → Claude
+search_procurement_interpretations(query,kw)  → 조달청 해석사례 BM25(keywords)+Dense(query) RRF → Claude
 ```
 
-- MCP 도구 4개. Claude가 질문 성격에 맞게 선택(또는 여러 개 호출)한다.
+- MCP 도구 5개. Claude가 질문 성격에 맞게 선택(또는 여러 개 호출)한다.
 - `search_law`/`search_lh_regulations`/`search_construction_standards`는 `query`(자연어 — AI검색·Dense)와 `keywords`(키워드 — 일반검색·BM25·admrul)를 받는다.
 - `search_law`: 법령(aiSearch, query) + 국토교통부 행정규칙(admrul, keywords, 상위 N건 본문 조회) concat.
   AI검색 실패 시 키워드 일반검색 fallback.
@@ -40,18 +46,23 @@ search_precedents(keywords)                   → 법제처 판례검색(prec) �
 - `search_precedents`: `keywords`만 받는다(판례 API는 키워드 AND 매칭). 상위 N건의 판시사항·판결요지·
   참조조문·참조판례를 조회(전문 제외). 결과 0건이면 첫 번째 키워드만으로 자동 재시도하므로,
   핵심 키워드를 맨 앞에 두고 최대 2개로 주는 것이 좋다.
+- `search_procurement_interpretations`: 조달청 계약법규 해석사례(법제처 OPEN API `ppsCgmExpc`로
+  적재한 864건, 2022~)를 BM25(keywords)+Dense(query) RRF로 검색. 안건명+질의요지+회답+이유+
+  관련법령 본문 전체가 인덱싱 대상이라 제목에 없는 표현도 의미검색된다. 인증키는 법제처 OC
+  (`LAW_OC_DEFAULT`) 재사용. 과거(2014~2021)분은 API 미제공.
 
 ## 파일 지도
 
 | 파일 | 역할 |
 |---|---|
-| `src/server.py` | FastMCP 앱, 미들웨어, `search_law`·`search_lh_regulations`·`search_construction_standards`·`search_precedents` 툴 |
+| `src/server.py` | FastMCP 앱, 미들웨어, `search_law`·`search_lh_regulations`·`search_construction_standards`·`search_precedents`·`search_procurement_interpretations` 툴 |
 | `src/config.py` | 환경변수 (pydantic-settings) |
 | `src/context.py` | `law_oc_var` — 요청별 법제처 API 키 격리 (contextvars) |
 | `src/sources/law_api.py` | 법령(AI검색→일반검색 fallback) + 국토부 행정규칙(admrul+본문) |
 | `src/sources/lh_vector.py` | LH 규정 BM25(keywords)+Dense(query) 하이브리드, RRF 결합 |
 | `src/sources/kcsc_vector.py` | KCSC 건설기준 BM25+Dense 하이브리드 + 인용 그래프 1-hop 확장 |
 | `src/sources/prec_api.py` | 법제처 판례(prec) 검색 + 상위 N건 요지(판시사항·판결요지·참조조문·참조판례) 조회 |
+| `src/sources/pps_vector.py` | 조달청 해석사례 BM25(keywords)+Dense(query) 하이브리드, RRF 결합 |
 | `src/sources/base.py` | `SearchResult`, `SearchSource` 추상 클래스 |
 | `crawler/lh_crawler.py` | RSS 파싱 + LH 사이트 크롤링 + 파일 다운로드 |
 | `crawler/pdf_converter.py` | PDF → 마크다운 변환 (docling, 표 구조 + OCR) |
@@ -60,9 +71,12 @@ search_precedents(keywords)                   → 법제처 판례검색(prec) �
 | `crawler/dense_index.py` | Dense 임베딩 인덱스 빌드·저장·로드·증분 갱신 |
 | `crawler/kcsc_api.py` | KCSC Open API 클라이언트, HTML→텍스트 변환, 인용 추출(2-pass 정규식) |
 | `crawler/kcsc_indexer.py` | KCSC 크롤(JSON 캐시) + BM25/Dense/그래프 빌드 |
+| `crawler/pps_api.py` | 조달청 해석사례 클라이언트 (법제처 OPEN API `ppsCgmExpc`, 목록+본문 JSON) |
+| `crawler/pps_indexer.py` | 조달청 해석사례 적재(JSON 캐시) + BM25/Dense 빌드 (데이터기준일시 증분) |
 | `crawler/rss_watcher.py` | 주기적 RSS 감시 데몬 |
 | `scripts/build_index.py` | LH 규정 인덱스 빌드 엔트리포인트 (`--limit N` 옵션) |
 | `scripts/build_kcsc_index.py` | KCSC 인덱스 빌드 엔트리포인트 (`--type`, `--limit`, `--from-cache`, `--force`) |
+| `scripts/build_pps_index.py` | 조달청 해석사례 인덱스 빌드 엔트리포인트 (`--limit`, `--from-cache`, `--force`) |
 
 ## 새 소스 추가
 
@@ -109,6 +123,10 @@ data/
     kcsc_standards.pkl        ← KCSC BM25 인덱스
     kcsc_standards_dense.pkl  ← KCSC Dense 인덱스
     kcsc_standards_graph.pkl  ← 인용 그래프 (노드·엣지·청크 매핑)
+  pps/
+    cache/                    ← 조달청 해석사례 캐시: {YYYYMMDD}_{법령해석일련번호}.json
+    pps_interpretations.pkl       ← 조달청 해석사례 BM25 인덱스
+    pps_interpretations_dense.pkl ← 조달청 해석사례 Dense 인덱스
 docs/  ← 구현 전략, 참고할 지식
 ```
 
@@ -128,6 +146,14 @@ python scripts/build_kcsc_index.py
 # KCSC 인덱스만 재빌드 (캐시 유지)
 rm -f data/kcsc/*.pkl
 python scripts/build_kcsc_index.py --from-cache
+
+# 조달청 해석사례 (캐시 포함 전체 초기화)
+rm -rf data/pps/
+python scripts/build_pps_index.py
+
+# 조달청 해석사례 인덱스만 재빌드 (캐시 유지)
+rm -f data/pps/*.pkl
+python scripts/build_pps_index.py --from-cache
 ```
 
 ## PDF 변환 (docling 사용 이유)
