@@ -73,7 +73,7 @@ https://lh-rag-mcp.fly.dev/mcp?law_oc=법제처키
 | 도구 | 검색 대상 | 이런 질문에 |
 | --- | --- | --- |
 | 🏛️ `search_law` | 국가법령정보센터 법령 · 국토교통부 행정규칙 | "공공임대주택 임대료 인상 상한은?" |
-| 📋 `search_lh_regulations` | LH 사내 규정 · 규칙 · 시행세칙 | "해외 출장 일비·숙박비 지급 기준은?" |
+| 📋 `search_lh_regulations` | 공개된 LH 규정 · 시행세칙 | "해외 출장 일비·숙박비 지급 기준은?" |
 | 🏗️ `search_construction_standards` | 건설기준 KDS · KCS · LHCS (설계기준 · 시방서) | "옹벽 설계 시 토압 산정 방법은?" |
 | ⚖️ `search_precedents` | 법원 판례 (판시사항 · 판결요지 · 참조조문) | "토지수용 보상금 증액 판례 있어?" |
 

@@ -60,10 +60,10 @@ class KCSCVectorSource(SearchSource):
 
             self._loaded = True
 
-    def _dense_search(self, q_vec):
+    def _dense_search(self, q_vec, top_k: int = TOP_K_CANDIDATES):
         if not self._dense or q_vec is None:
             return []
-        return dense_search(self._dense, q_vec, top_k=TOP_K_CANDIDATES)
+        return dense_search(self._dense, q_vec, top_k=top_k)
 
     def _make_result(self, cid: str, via: str = "", citing: str = "") -> SearchResult | None:
         idx = self._id_to_idx.get(cid)
@@ -164,7 +164,12 @@ class KCSCVectorSource(SearchSource):
                 results.append(r)
         return results
 
-    async def search(self, query: str, keywords: str) -> list[SearchResult]:
+    async def search(
+        self,
+        query: str,
+        keywords: str,
+        code_types: set[str] | None = None,
+    ) -> list[SearchResult]:
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, self._ensure_loaded)
 
@@ -174,6 +179,9 @@ class KCSCVectorSource(SearchSource):
                 title="KCSC 건설기준 DB 미구축",
                 content="KCSC 인덱스가 없습니다. scripts/build_kcsc_index.py를 실행하세요.",
             )]
+
+        # 필터링 시 후처리로 걸러지는 만큼 후보 수를 늘림
+        candidate_k = TOP_K_CANDIDATES * 2 if code_types else TOP_K_CANDIDATES
 
         # 쿼리 임베딩 (Dense·인용 확장에서 공용)
         q_vec = None
@@ -185,15 +193,25 @@ class KCSCVectorSource(SearchSource):
 
         bm25 = self._bm25
         bm25_task = loop.run_in_executor(
-            None, lambda: bm25_search(bm25, keywords, top_k=TOP_K_CANDIDATES)
+            None, lambda: bm25_search(bm25, keywords, top_k=candidate_k)
         )
-        dense_task = loop.run_in_executor(None, lambda: self._dense_search(q_vec))
+        dense_task = loop.run_in_executor(None, lambda: self._dense_search(q_vec, top_k=candidate_k))
         bm25_hits, dense_hits = await asyncio.gather(bm25_task, dense_task)
 
         if dense_hits:
-            top_ids = _rrf(bm25_hits, dense_hits, top_n=KCSC_TOP_K_PRIMARY)
+            top_ids = _rrf(bm25_hits, dense_hits, top_n=candidate_k)
         else:
-            top_ids = [cid for cid, _ in bm25_hits[:KCSC_TOP_K_PRIMARY]]
+            top_ids = [cid for cid, _ in bm25_hits[:candidate_k]]
+
+        # code_type 필터 적용
+        if code_types:
+            top_ids = [
+                cid for cid in top_ids
+                if (idx := self._id_to_idx.get(cid)) is not None
+                and self._bm25.metadatas[idx].get("code_type") in code_types
+            ][:KCSC_TOP_K_PRIMARY]
+        else:
+            top_ids = top_ids[:KCSC_TOP_K_PRIMARY]
 
         output: list[SearchResult] = []
         for cid in top_ids:
