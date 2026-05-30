@@ -6,69 +6,128 @@ LH(한국토지주택공사) 임직원용 법령·규정 RAG MCP 서버. Claude 
 ## 빠른 실행
 
 ```bash
-source .venv/bin/activate       # 또는 uv sync
-python scripts/build_index.py   # 인덱스 빌드 (최초 1회, ~20~30분)
-python -m src.server            # MCP 서버 실행 (또는 lh-rag-mcp)
+source .venv/bin/activate            # 또는 uv sync
+
+# LH 규정 인덱스 빌드 (최초 1회, ~20~30분)
+python scripts/build_index.py
+
+# KCSC 건설기준 인덱스 빌드 (최초 1회, 전체 ~수십분)
+python scripts/build_kcsc_index.py
+# 테스트 (유형별 5개씩만)
+python scripts/build_kcsc_index.py --type KDS --limit 5
+python scripts/build_kcsc_index.py --type KCS --limit 5
+python scripts/build_kcsc_index.py --type LHCS --limit 5
+python scripts/build_kcsc_index.py --from-cache   # 인덱스만 재빌드
+
+python -m src.server                 # MCP 서버 실행 (또는 lh-rag-mcp)
 ```
 
 ## 아키텍처
 
 ```
-search_law(query, keywords)            → 법제처 AI검색(법령) + admrul(국토부 행정규칙) → Claude
-search_lh_regulations(query, keywords) → LH 규정 BM25(keywords)+Dense(query) RRF       → Claude
+search_law(query, keywords)                   → 법제처 AI검색(법령) + admrul(국토부 행정규칙) → Claude
+search_lh_regulations(query, keywords)        → LH 규정 BM25(keywords)+Dense(query) RRF       → Claude
+search_construction_standards(query,keywords) → KCSC 건설기준 BM25+Dense RRF + 인용그래프 1-hop → Claude
+search_precedents(keywords)                   → 법제처 판례검색(prec) 상위 N건 요지 조회        → Claude
 ```
 
-- MCP 도구 2개. Claude가 질문 성격에 맞게 선택(또는 둘 다 호출)한다.
-- 두 도구 모두 `query`(자연어 — AI검색·Dense)와 `keywords`(키워드 — 일반검색·BM25·admrul)를 받는다.
+- MCP 도구 4개. Claude가 질문 성격에 맞게 선택(또는 여러 개 호출)한다.
+- `search_law`/`search_lh_regulations`/`search_construction_standards`는 `query`(자연어 — AI검색·Dense)와 `keywords`(키워드 — 일반검색·BM25·admrul)를 받는다.
 - `search_law`: 법령(aiSearch, query) + 국토교통부 행정규칙(admrul, keywords, 상위 N건 본문 조회) concat.
-  AI검색 실패 시 키워드 일반검색 fallback. 판례는 미지원(향후 별도 툴).
+  AI검색 실패 시 키워드 일반검색 fallback.
+- `search_construction_standards`: KDS(설계기준)·KCS(표준시방서)·LHCS(LH 전문시방서)를 BM25+Dense
+  하이브리드로 검색하고, 1차 결과 조문이 인용하는 대상 조문을 인용 그래프로 1-hop 확장해 함께 반환.
+- `search_precedents`: `keywords`만 받는다(판례 API는 키워드 AND 매칭). 상위 N건의 판시사항·판결요지·
+  참조조문·참조판례를 조회(전문 제외). 결과 0건이면 첫 번째 키워드만으로 자동 재시도하므로,
+  핵심 키워드를 맨 앞에 두고 최대 2개로 주는 것이 좋다.
 
 ## 파일 지도
 
 | 파일 | 역할 |
 |---|---|
-| `src/server.py` | FastMCP 앱, 미들웨어, `search_law`·`search_lh_regulations` 툴 |
+| `src/server.py` | FastMCP 앱, 미들웨어, `search_law`·`search_lh_regulations`·`search_construction_standards`·`search_precedents` 툴 |
 | `src/config.py` | 환경변수 (pydantic-settings) |
 | `src/context.py` | `law_oc_var` — 요청별 법제처 API 키 격리 (contextvars) |
 | `src/sources/law_api.py` | 법령(AI검색→일반검색 fallback) + 국토부 행정규칙(admrul+본문) |
-| `src/sources/lh_vector.py` | BM25(keywords)+Dense(query) 하이브리드, RRF 결합, 결과 7개 |
+| `src/sources/lh_vector.py` | LH 규정 BM25(keywords)+Dense(query) 하이브리드, RRF 결합 |
+| `src/sources/kcsc_vector.py` | KCSC 건설기준 BM25+Dense 하이브리드 + 인용 그래프 1-hop 확장 |
+| `src/sources/prec_api.py` | 법제처 판례(prec) 검색 + 상위 N건 요지(판시사항·판결요지·참조조문·참조판례) 조회 |
 | `src/sources/base.py` | `SearchResult`, `SearchSource` 추상 클래스 |
 | `crawler/lh_crawler.py` | RSS 파싱 + LH 사이트 크롤링 + 파일 다운로드 |
 | `crawler/pdf_converter.py` | PDF → 마크다운 변환 (docling, 표 구조 + OCR) |
-| `crawler/indexer.py` | BM25 증분 동기화 (title 기본키, pubDate 비교) |
-| `crawler/bm25_index.py` | BM25 인덱스 빌드·저장·로드·검색 |
+| `crawler/indexer.py` | LH 규정 BM25 증분 동기화 (title 기본키, pubDate 비교) |
+| `crawler/bm25_index.py` | BM25 인덱스 빌드·저장·로드·검색 (`base_path`로 LH/KCSC 분리) |
+| `crawler/dense_index.py` | Dense 임베딩 인덱스 빌드·저장·로드·증분 갱신 |
+| `crawler/kcsc_api.py` | KCSC Open API 클라이언트, HTML→텍스트 변환, 인용 추출(2-pass 정규식) |
+| `crawler/kcsc_indexer.py` | KCSC 크롤(JSON 캐시) + BM25/Dense/그래프 빌드 |
 | `crawler/rss_watcher.py` | 주기적 RSS 감시 데몬 |
-| `scripts/build_index.py` | 인덱스 빌드 엔트리포인트 (`--limit N` 옵션) |
+| `scripts/build_index.py` | LH 규정 인덱스 빌드 엔트리포인트 (`--limit N` 옵션) |
+| `scripts/build_kcsc_index.py` | KCSC 인덱스 빌드 엔트리포인트 (`--type`, `--limit`, `--from-cache`, `--force`) |
 
 ## 새 소스 추가
 
 1. `src/sources/` 에 `SearchSource` 상속 클래스 작성 (`search(query, keywords)` 구현)
 2. `src/server.py` `_sources` 딕셔너리에 인스턴스 추가
 3. `src/server.py` 에 `@mcp.tool()` 함수 추가 (`_search_single(source_id, query, keywords)` 호출)
+   - 단일 파라미터 툴은 `_search_single`을 우회해 직접 호출 가능 (예: `search_precedents`는 `keywords`만 받음)
+
+## 테스트
+
+MCP Inspector로 도구를 직접 호출해 확인한다:
+
+```bash
+npx @modelcontextprotocol/inspector python -m src.server
+```
+
+배포 서버 대상 엔드투엔드 테스트는 `https://lh-rag-mcp.fly.dev/mcp?law_oc=<키>` 에
+streamable-http(JSON-RPC)로 `initialize` → `tools/list` → `tools/call` 순으로 호출한다.
 
 ## 환경변수 (.env)
 
 ```ini
-LAW_OC_DEFAULT=...   # 법제처 API 기본 키 (없으면 ?law_oc= URL 파라미터 필수)
-MCP_API_KEY=...      # Bearer 인증 (비워두면 인증 없음)
+LAW_OC_DEFAULT=...       # 법제처 API 기본 키 (없으면 ?law_oc= URL 파라미터 필수)
+MCP_API_KEY=...          # Bearer 인증 (비워두면 인증 없음)
 LH_RSS_URL=https://www.lh.or.kr/rss/board.es?mid=a10108020000&bid=0055
-TORCH_DEVICE=mps     # mps | cuda | cpu
-BM25_PATH=./data/bm25
-MARKDOWN_PATH=./data/markdown
+TORCH_DEVICE=mps         # mps | cuda | cpu
+BM25_PATH=./data/lh_regulation
+MARKDOWN_PATH=./data/lh_regulation/markdown
+KCSC_API_KEY=...         # 국가건설기준센터 Open API 인증키
+KCSC_DATA_PATH=./data/kcsc
+DEEPINFRA_API_KEY=...    # Dense 임베딩 (미설정 시 BM25만 사용)
 ```
 
 ## 데이터 경로
 
 ```
 data/
-  markdown/  ← docling 변환 캐시: {YYMMDD}_{title_key}.md
-  bm25/      ← BM25 인덱스: lh_regulations.pkl
+  lh_regulation/
+    lh_regulations.pkl        ← LH 규정 BM25 인덱스
+    lh_regulations_dense.pkl  ← LH 규정 Dense 인덱스
+    markdown/                 ← docling 변환 캐시: {YYMMDD}_{title_key}.md
+  kcsc/
+    cache/                    ← KCSC API 응답 캐시: {YYYYMMDD}_{doc_key}.json
+    kcsc_standards.pkl        ← KCSC BM25 인덱스
+    kcsc_standards_dense.pkl  ← KCSC Dense 인덱스
+    kcsc_standards_graph.pkl  ← 인용 그래프 (노드·엣지·청크 매핑)
+docs/  ← 구현 전략, 참고할 지식
 ```
+
+KCSC 청킹: lv1/lv2 헤더를 경계로 하위 섹션(lv3/lv4)을 합산. 60자 미만 그룹은 다음 그룹에 병합.
+KCSC 증분: `cache/` 파일명 날짜(`YYYYMMDD`) ↔ API `updateDate` 비교로 변경분만 크롤.
 
 인덱스 초기화:
 ```bash
-rm -f data/bm25/*.pkl
+# LH 규정
+rm -f data/lh_regulation/*.pkl
 python scripts/build_index.py
+
+# KCSC 건설기준 (캐시 포함 전체 초기화)
+rm -rf data/kcsc/
+python scripts/build_kcsc_index.py
+
+# KCSC 인덱스만 재빌드 (캐시 유지)
+rm -f data/kcsc/*.pkl
+python scripts/build_kcsc_index.py --from-cache
 ```
 
 ## PDF 변환 (docling 사용 이유)

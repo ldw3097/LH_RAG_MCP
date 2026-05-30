@@ -17,7 +17,6 @@ LAW_PORTAL_BASE = "https://www.law.go.kr"
 
 PREC_DETAIL_K = 5  # 요지까지 조회할 상위 건수
 
-_IMG_TAG_RE = re.compile(r"<img[^>]*>(?:</img>)?", re.IGNORECASE)
 _TAG_RE = re.compile(r"<[^>]+>")
 
 
@@ -41,6 +40,12 @@ class PrecedentSource(SearchSource):
         """판례 키워드 검색 후 상위 N건 요지를 병렬 조회해 반환."""
         kw = keywords or query
         items = await self._prec_search(kw)
+        if not items:
+            # 결과 없으면 첫 번째 키워드만으로 재시도
+            first_kw = kw.split()[0]
+            if first_kw != kw:
+                logger.info("판례 검색 결과 없음, 첫 키워드로 재시도: %s", first_kw)
+                items = await self._prec_search(first_kw)
         if not items:
             return []
         contents = await asyncio.gather(

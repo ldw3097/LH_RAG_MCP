@@ -14,7 +14,7 @@ import asyncio
 import logging
 import re
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
@@ -27,7 +27,7 @@ from crawler.lh_crawler import LHDocumentFetcher, RssItem, parse_rss_feed
 from crawler.bm25_index import (
     build_and_save, get_all_title_keys, load_bm25, remove_doc_chunks,
 )
-from crawler.dense_index import build_and_save_dense, update_dense_incremental
+from crawler.dense_index import update_dense_incremental
 
 _markdown_dir: Path | None = None
 
@@ -61,11 +61,7 @@ _SKIP_PATTERNS = re.compile(
 
 def _should_skip(title: str) -> bool:
     t = title.strip()
-    if t.endswith(_SKIP_SUFFIXES):
-        return True
-    if _SKIP_PATTERNS.search(t):
-        return True
-    return False
+    return t.endswith(_SKIP_SUFFIXES) or bool(_SKIP_PATTERNS.search(t))
 
 
 logger = logging.getLogger(__name__)

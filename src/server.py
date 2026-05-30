@@ -9,11 +9,13 @@ from src.config import settings
 from src.context import law_oc_var
 from src.sources.law_api import LawApiSource
 from src.sources.lh_vector import LHVectorSource
+from src.sources.kcsc_vector import KCSCVectorSource
 from src.sources.prec_api import PrecedentSource
 
 SOURCE_LABELS = {
     "law_api": "국가법령정보센터",
     "lh_vector_db": "LH 규정",
+    "kcsc_vector_db": "건설기준(KDS/KCS/LHCS)",
     "prec": "법원 판례",
 }
 
@@ -28,7 +30,9 @@ mcp = FastMCP(
         "LH 사내 규정(인사·보수·직제·감사·보안·문서·업무 등 임직원 적용 규정·규칙·시행세칙)은 "
         "search_lh_regulations 도구로 검색하세요. "
         "법원 판례는 search_precedents 도구로 키워드 검색하세요. "
-        "두 도구 모두 자연어 질의(query)와 핵심 키워드(keywords)를 함께 전달하세요. "
+        "건설기준(KDS 설계기준·KCS 표준시방서·LHCS LH 전문시방서)은 "
+        "search_construction_standards 도구로 검색하세요. "
+        "검색 도구는 자연어 질의(query)와 핵심 키워드(keywords)를 함께 전달하세요. "
         "질문이 여러 영역에 걸쳐 있으면 해당 도구들을 모두 호출하세요."
     ),
 )
@@ -36,6 +40,7 @@ mcp = FastMCP(
 _sources = {
     "law_api": LawApiSource(),
     "lh_vector_db": LHVectorSource(),
+    "kcsc_vector_db": KCSCVectorSource(),
     "prec": PrecedentSource(),
 }
 
@@ -93,16 +98,38 @@ async def search_lh_regulations(query: str, keywords: str) -> str:
 
 
 @mcp.tool()
+async def search_construction_standards(query: str, keywords: str) -> str:
+    """
+    건설기준(KDS·KCS·LHCS)을 검색합니다.
+
+    KDS(설계기준)·KCS(표준시방서)·LHCS(LH 전문시방서) 등 건설 설계·시공 기준을
+    검색합니다. 구조·지반·토목·건축·시공 방법, 재료·품질 기준, 설계 하중·안전율 등
+    기술적 건설기준에 관한 질문에 사용하세요. (국가 법령이나 LH 사내 행정규정이 아닌
+    건설 기술기준입니다.)
+
+    검색 결과는 해당 조문이 인용하는 다른 기준의 조문(예: KDS가 참조하는 KCS)을
+    인용 그래프로 1-hop 확장해 함께 반환합니다.
+
+    Args:
+        query: 자연어로 요약한 질의 (예: "옹벽 설계 시 토압 산정 방법").
+        keywords: 핵심 키워드를 공백으로 구분 (예: "옹벽 토압 안정성 설계").
+    """
+    return await _search_single("kcsc_vector_db", query, keywords)
+
+
+@mcp.tool()
 async def search_precedents(keywords: str) -> str:
     """
     법원 판례를 키워드로 검색합니다. 판시사항·판결요지·참조조문 중심으로 반환합니다.
 
-    쟁점·사실관계 키워드로 자유롭게 검색할 수 있습니다.
-    키워드는 공백 구분 AND 매칭입니다.
+    키워드는 공백 구분 AND 매칭입니다. 가장 중요한 핵심 키워드를 맨 앞에 두고
+    최대 2개만 사용하세요. 결과가 없으면 자동으로 첫 번째 키워드만으로 재검색합니다.
+    search_law 결과의 법령명·조문번호를 포함하면 해당 법령을 인용한 판례를 찾을 수 있습니다.
 
     Args:
-        keywords: 검색할 키워드를 공백으로 구분 (예: "보증금 우선변제", "주택임대차보호법 제3조").
-            search_law 결과의 법령명·조문번호를 포함하면 해당 법령을 인용한 판례를 찾을 수 있습니다.
+        keywords: 핵심 키워드 최대 2개를 공백으로 구분. 가장 중요한 키워드를 맨 앞에.
+            첫 번째 키워드는 검색 실패 시 단독 재검색에 쓰이므로 구체적으로 선택.
+            (예: "토지수용 보상", "임대차 해지", "주택임대차보호법 제3조")
     """
     logger.info("검색 요청 [prec]: keywords=%s", keywords)
     try:
@@ -157,6 +184,7 @@ def main():
     # 첫 요청 전 BM25 인덱스·kiwipiepy 사전 로딩 (ML 모델 없음 — 수초 이내)
     logger.info("BM25 인덱스 사전 로딩 시작...")
     _sources["lh_vector_db"]._ensure_loaded()
+    _sources["kcsc_vector_db"]._ensure_loaded()
     logger.info("BM25 인덱스 사전 로딩 완료")
 
     app = mcp.http_app(transport="streamable-http")

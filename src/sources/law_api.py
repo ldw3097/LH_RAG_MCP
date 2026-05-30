@@ -169,37 +169,6 @@ class LawApiSource(SearchSource):
             body = "\n".join(p for p in parts if p)
         return _IMG_TAG_RE.sub("", body or "").strip()
 
-    async def _fetch_article(self, mst: str, query: str) -> str:
-        """법령 조문 전문 조회 (검색 결과 보강용)."""
-        params = {
-            "OC": law_oc_var.get() or settings.law_oc_default,
-            "target": "law",
-            "MST": mst,
-            "type": "JSON",
-        }
-        url = f"{LAW_API_BASE}/lawService.do?{urlencode(params)}"
-        try:
-            resp = await self._client.get(url)
-            resp.raise_for_status()
-            data = resp.json()
-            articles = data.get("법령", {}).get("조문", {}).get("조문단위", [])
-            if isinstance(articles, dict):
-                articles = [articles]
-            # 쿼리 키워드가 포함된 조문만 발췌 (최대 2개)
-            matched = []
-            for art in articles:
-                content = art.get("조문내용", "")
-                if any(kw in content for kw in query.split()[:3]):
-                    matched.append(
-                        f"제{art.get('조문번호', '')}조 {art.get('조문제목', '')}\n{content}"
-                    )
-                if len(matched) >= 2:
-                    break
-            return "\n\n".join(matched) if matched else ""
-        except Exception as e:
-            logger.debug("조문 조회 실패 mst=%s: %s", mst, e)
-            return ""
-
     def _parse_ai_results(self, data: dict) -> list[SearchResult]:
         items = data.get("aiSearch", {}).get("법령조문", [])
         if isinstance(items, dict):
