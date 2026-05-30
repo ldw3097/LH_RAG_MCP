@@ -68,7 +68,7 @@ class LHVectorSource(SearchSource):
             logger.warning("Dense 검색 실패 (BM25만 사용): %s", e)
             return []
 
-    async def search(self, query: str) -> list[SearchResult]:
+    async def search(self, query: str, keywords: str) -> list[SearchResult]:
         loop = asyncio.get_event_loop()
         await loop.run_in_executor(None, self._ensure_loaded)
 
@@ -82,9 +82,9 @@ class LHVectorSource(SearchSource):
         bm25 = self._bm25
         id_to_idx = self._id_to_idx
 
-        # BM25·Dense 병렬 실행
+        # BM25(키워드)·Dense(자연어) 병렬 실행
         bm25_task = loop.run_in_executor(
-            None, lambda: bm25_search(bm25, query, top_k=TOP_K_CANDIDATES)
+            None, lambda: bm25_search(bm25, keywords, top_k=TOP_K_CANDIDATES)
         )
         dense_task = loop.run_in_executor(None, lambda: self._dense_search(query))
         bm25_hits, dense_hits = await asyncio.gather(bm25_task, dense_task)

@@ -14,22 +14,24 @@ python -m src.server            # MCP 서버 실행 (또는 lh-rag-mcp)
 ## 아키텍처
 
 ```
-질문 → 법제처 AI 검색 API (7개)  ─┐
-     → LH 규정 BM25 검색 (7개)  ─┴→ 이어붙이기 → Claude
+search_law(query, keywords)            → 법제처 AI검색(법령) + admrul(국토부 행정규칙) → Claude
+search_lh_regulations(query, keywords) → LH 규정 BM25(keywords)+Dense(query) RRF       → Claude
 ```
 
-- 라우터 없음. 모든 소스를 항상 병렬 검색한다.
-- 두 소스는 문서 집합이 겹치지 않으므로 RRF 불필요, 단순 concat.
+- MCP 도구 2개. Claude가 질문 성격에 맞게 선택(또는 둘 다 호출)한다.
+- 두 도구 모두 `query`(자연어 — AI검색·Dense)와 `keywords`(키워드 — 일반검색·BM25·admrul)를 받는다.
+- `search_law`: 법령(aiSearch, query) + 국토교통부 행정규칙(admrul, keywords, 상위 N건 본문 조회) concat.
+  AI검색 실패 시 키워드 일반검색 fallback. 판례는 미지원(향후 별도 툴).
 
 ## 파일 지도
 
 | 파일 | 역할 |
 |---|---|
-| `src/server.py` | FastMCP 앱, 미들웨어, `search_lh_knowledge` 툴 |
+| `src/server.py` | FastMCP 앱, 미들웨어, `search_law`·`search_lh_regulations` 툴 |
 | `src/config.py` | 환경변수 (pydantic-settings) |
 | `src/context.py` | `law_oc_var` — 요청별 법제처 API 키 격리 (contextvars) |
-| `src/sources/law_api.py` | 법제처 AI검색 → 일반검색 fallback, 결과 7개 |
-| `src/sources/lh_vector.py` | BM25(kiwipiepy) 검색, 결과 7개 |
+| `src/sources/law_api.py` | 법령(AI검색→일반검색 fallback) + 국토부 행정규칙(admrul+본문) |
+| `src/sources/lh_vector.py` | BM25(keywords)+Dense(query) 하이브리드, RRF 결합, 결과 7개 |
 | `src/sources/base.py` | `SearchResult`, `SearchSource` 추상 클래스 |
 | `crawler/lh_crawler.py` | RSS 파싱 + LH 사이트 크롤링 + 파일 다운로드 |
 | `crawler/pdf_converter.py` | PDF → 마크다운 변환 (docling, 표 구조 + OCR) |
@@ -40,8 +42,9 @@ python -m src.server            # MCP 서버 실행 (또는 lh-rag-mcp)
 
 ## 새 소스 추가
 
-1. `src/sources/` 에 `SearchSource` 상속 클래스 작성
+1. `src/sources/` 에 `SearchSource` 상속 클래스 작성 (`search(query, keywords)` 구현)
 2. `src/server.py` `_sources` 딕셔너리에 인스턴스 추가
+3. `src/server.py` 에 `@mcp.tool()` 함수 추가 (`_search_single(source_id, query, keywords)` 호출)
 
 ## 환경변수 (.env)
 
