@@ -37,16 +37,16 @@ class DenseStore(NamedTuple):
     embeddings: np.ndarray  # (N, D) float32, L2 정규화 완료
 
 
-def _index_path(collection: str) -> Path:
-    p = Path(settings.bm25_path)
+def _index_path(collection: str, base_path: str | None = None) -> Path:
+    p = Path(base_path or settings.bm25_path)
     p.mkdir(parents=True, exist_ok=True)
     return p / f"{collection}_dense.pkl"
 
 
-def load_dense(collection: str | None = None) -> DenseStore | None:
+def load_dense(collection: str | None = None, base_path: str | None = None) -> DenseStore | None:
     """저장된 Dense 인덱스를 로드합니다. 없거나 형식이 다르면 None 반환."""
     col = collection or settings.bm25_collection
-    path = _index_path(col)
+    path = _index_path(col, base_path)
     if not path.exists():
         return None
     try:
@@ -85,6 +85,7 @@ def build_and_save_dense(
     ids: list[str],
     corpus: list[str],
     collection: str | None = None,
+    base_path: str | None = None,
 ) -> DenseStore:
     """청크 목록을 임베딩하고 Dense 인덱스를 저장합니다.
 
@@ -108,7 +109,7 @@ def build_and_save_dense(
     store = DenseStore(ids=ids, embeddings=embeddings)
 
     col = collection or settings.bm25_collection
-    path = _index_path(col)
+    path = _index_path(col, base_path)
     with path.open("wb") as f:
         pickle.dump(store, f)
     logger.info(
@@ -123,6 +124,7 @@ def update_dense_incremental(
     add_ids: list[str],
     add_corpus: list[str],
     collection: str | None = None,
+    base_path: str | None = None,
 ) -> DenseStore:
     """Dense 인덱스를 증분 갱신합니다.
 
@@ -135,7 +137,7 @@ def update_dense_incremental(
     if not api_key:
         raise ValueError("DEEPINFRA_API_KEY가 설정되지 않았습니다.")
 
-    existing = load_dense(collection)
+    existing = load_dense(collection, base_path)
 
     if existing and remove_keys:
         keep = [
@@ -171,7 +173,7 @@ def update_dense_incremental(
 
     store = DenseStore(ids=all_ids, embeddings=all_embs)
     col = collection or settings.bm25_collection
-    path = _index_path(col)
+    path = _index_path(col, base_path)
     with path.open("wb") as f:
         pickle.dump(store, f)
     logger.info(

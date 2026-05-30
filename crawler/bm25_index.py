@@ -57,16 +57,16 @@ class BM25Store(NamedTuple):
     bm25: object           # BM25Okapi 인스턴스
 
 
-def _index_path(collection: str) -> Path:
-    p = Path(settings.bm25_path)
+def _index_path(collection: str, base_path: str | None = None) -> Path:
+    p = Path(base_path or settings.bm25_path)
     p.mkdir(parents=True, exist_ok=True)
     return p / f"{collection}.pkl"
 
 
-def load_bm25(collection: str | None = None) -> BM25Store | None:
+def load_bm25(collection: str | None = None, base_path: str | None = None) -> BM25Store | None:
     """저장된 BM25 인덱스를 로드합니다. 없거나 형식이 다르면 None 반환."""
     col = collection or settings.bm25_collection
-    path = _index_path(col)
+    path = _index_path(col, base_path)
     if not path.exists():
         return None
     try:
@@ -87,6 +87,7 @@ def build_and_save(
     corpus: list[str],
     metadatas: list[dict],
     collection: str | None = None,
+    base_path: str | None = None,
 ) -> BM25Store:
     """청크 목록으로 BM25 인덱스를 빌드하고 저장합니다."""
     from rank_bm25 import BM25Okapi
@@ -96,7 +97,7 @@ def build_and_save(
     store = BM25Store(ids=ids, corpus=corpus, metadatas=metadatas, bm25=bm25)
 
     col = collection or settings.bm25_collection
-    path = _index_path(col)
+    path = _index_path(col, base_path)
     with path.open("wb") as f:
         pickle.dump(store, f)
     logger.info("BM25 인덱스 저장: %d청크 → %s", len(ids), path.name)

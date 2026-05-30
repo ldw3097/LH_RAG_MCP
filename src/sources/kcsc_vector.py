@@ -38,7 +38,8 @@ class KCSCVectorSource(SearchSource):
         with self._lock:
             if self._loaded:
                 return
-            self._bm25 = load_bm25(self._collection)
+            bp = settings.kcsc_data_path
+            self._bm25 = load_bm25(self._collection, base_path=bp)
             if self._bm25:
                 self._id_to_idx = {cid: i for i, cid in enumerate(self._bm25.ids)}
                 logger.info("KCSC BM25 로드: %d청크", len(self._bm25.ids))
@@ -46,7 +47,7 @@ class KCSCVectorSource(SearchSource):
             else:
                 logger.warning("KCSC BM25 인덱스 없음 — build_kcsc_index.py를 실행하세요.")
 
-            self._dense = load_dense(self._collection)
+            self._dense = load_dense(self._collection, base_path=bp)
             if self._dense:
                 self._dense_idx = {cid: i for i, cid in enumerate(self._dense.ids)}
             else:

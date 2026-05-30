@@ -29,7 +29,14 @@ WANTED_TYPES = ("KDS", "KCS", "LHCS")
 # 인용으로 인정하는 코드 타입 (본문에서 다른 기준을 인용할 때 쓰는 접두어)
 _CITATION_TYPES = ("KDS", "KCS", "LHCS", "EXCS", "SMCS")
 
-# "KCS 14 20 10" 형태의 코드 + 뒤따르는 선택적 절 번호 "의 3.2" / "(3.2.1)"
+# LHCS 전용 8자리 패턴 (2-2-2-2). 6자리 패턴보다 먼저 적용한다.
+_LHCS8_RE = re.compile(
+    r"LHCS\s*"
+    r"(?P<code>\d{2}\s*\d{2}\s*\d{2}\s*\d{2})"
+    r"(?:\s*(?:의|,)?\s*\(?(?P<label>\d+(?:\.\d+)*)\)?)?"
+)
+
+# 6자리 패턴 — KDS/KCS/EXCS/SMCS 전용 및 LHCS 폴백
 _CITATION_RE = re.compile(
     r"(?P<type>" + "|".join(_CITATION_TYPES) + r")\s*"
     r"(?P<code>\d{2}\s*\d{2}\s*\d{2})"
@@ -146,6 +153,11 @@ class KcscApiClient:
             title = (it.get("title") or "").strip()
             if not text and not title:
                 continue
+            # API placeholder 제거
+            if text in ("내용 없음", "내용없음", "내용 없음.", "내용없음."):
+                text = ""
+            if not text and not title:
+                continue
             sections.append(Section(
                 label=(it.get("label") or "").strip().rstrip("."),
                 level=int(it.get("level") or 0),
@@ -158,6 +170,13 @@ class KcscApiClient:
 def extract_citations(text: str, self_meta: CodeMeta, known_codes: set[str]) -> set[str]:
     """본문에서 인용 노드 id 집합을 추출합니다.
 
+    2-pass 방식:
+      Pass 1 — LHCS 8자리 패턴(_LHCS8_RE): known_codes에 존재하면 채택하고
+               해당 매치 시작 위치를 기록한다.
+      Pass 2 — 6자리 패턴(_CITATION_RE): LHCS 타입이고 Pass 1에서 이미 처리된
+               위치이면 스킵 (8자리가 우선). known_codes에 없는 8자리 시도는
+               자동으로 6자리 폴백된다.
+
     Args:
         text: 검사할 텍스트(조문 본문/제목).
         self_meta: 현재 문서(자기 인용 제외용).
@@ -167,19 +186,36 @@ def extract_citations(text: str, self_meta: CodeMeta, known_codes: set[str]) -> 
         인용 노드 id 집합. 절 번호가 있으면 'KCS:142010:3.2', 없으면 'KCS:142010'.
     """
     found: set[str] = set()
+    lhcs8_positions: set[int] = set()
+
+    # Pass 1: LHCS 8자리
+    for m in _LHCS8_RE.finditer(text):
+        code = _norm_code(m.group("code"))
+        doc_key = f"LHCS{code}"
+        if doc_key not in known_codes or doc_key == self_meta.doc_key:
+            continue
+        lhcs8_positions.add(m.start())
+        label = m.group("label")
+        if label:
+            found.add(f"LHCS:{code}:{label}")
+        else:
+            found.add(f"LHCS:{code}")
+
+    # Pass 2: 6자리 (LHCS는 Pass 1 위치 제외)
     for m in _CITATION_RE.finditer(text):
+        if m.group("type") == "LHCS" and m.start() in lhcs8_positions:
+            continue
         ctype = m.group("type")
         code = _norm_code(m.group("code"))
         doc_key = f"{ctype}{code}"
-        if doc_key not in known_codes:
+        if doc_key not in known_codes or doc_key == self_meta.doc_key:
             continue
-        if doc_key == self_meta.doc_key:
-            continue  # 자기 자신 인용 제외
         label = m.group("label")
         if label:
             found.add(f"{ctype}:{code}:{label}")
         else:
             found.add(f"{ctype}:{code}")
+
     return found
 
 

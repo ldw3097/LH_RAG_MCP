@@ -40,6 +40,7 @@ mcp = FastMCP(
 _sources = {
     "law_api": LawApiSource(),
     "lh_vector_db": LHVectorSource(),
+    "kcsc_vector_db": KCSCVectorSource(),
     "prec": PrecedentSource(),
 }
 
@@ -94,6 +95,26 @@ async def search_lh_regulations(query: str, keywords: str) -> str:
         keywords: 핵심 키워드를 공백으로 구분.
     """
     return await _search_single("lh_vector_db", query, keywords)
+
+
+@mcp.tool()
+async def search_construction_standards(query: str, keywords: str) -> str:
+    """
+    건설기준(KDS·KCS·LHCS)을 검색합니다.
+
+    KDS(설계기준)·KCS(표준시방서)·LHCS(LH 전문시방서) 등 건설 설계·시공 기준을
+    검색합니다. 구조·지반·토목·건축·시공 방법, 재료·품질 기준, 설계 하중·안전율 등
+    기술적 건설기준에 관한 질문에 사용하세요. (국가 법령이나 LH 사내 행정규정이 아닌
+    건설 기술기준입니다.)
+
+    검색 결과는 해당 조문이 인용하는 다른 기준의 조문(예: KDS가 참조하는 KCS)을
+    인용 그래프로 1-hop 확장해 함께 반환합니다.
+
+    Args:
+        query: 자연어로 요약한 질의 (예: "옹벽 설계 시 토압 산정 방법").
+        keywords: 핵심 키워드를 공백으로 구분 (예: "옹벽 토압 안정성 설계").
+    """
+    return await _search_single("kcsc_vector_db", query, keywords)
 
 
 @mcp.tool()
@@ -163,6 +184,7 @@ def main():
     # 첫 요청 전 BM25 인덱스·kiwipiepy 사전 로딩 (ML 모델 없음 — 수초 이내)
     logger.info("BM25 인덱스 사전 로딩 시작...")
     _sources["lh_vector_db"]._ensure_loaded()
+    _sources["kcsc_vector_db"]._ensure_loaded()
     logger.info("BM25 인덱스 사전 로딩 완료")
 
     app = mcp.http_app(transport="streamable-http")

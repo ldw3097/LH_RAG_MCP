@@ -2,6 +2,7 @@
 /data/markdown/
 /data/bm25/
 /data/chroma/
+/data/kcsc/
 
 # 벡터DB 및 크롤링 데이터 (data/.gitkeep만 추적)
 /data/chroma/

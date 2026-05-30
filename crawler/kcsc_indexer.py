@@ -6,8 +6,14 @@ KCSC 건설기준 인덱스 구축.
                          (updateDate 비교로 변경분만 API 호출)
   2. build_from_cache() — JSON 캐시 → BM25 + Dense + 인용 그래프 빌드
 
-조문(Section) 단위로 청킹하며, 청크 ID는 '{codeType}{code}__c{idx:04d}'로 문서 단위 키를
-유지해 기존 증분 유틸(get_all_title_keys, update_dense_incremental)을 그대로 재사용한다.
+청킹은 lv1/lv2 헤더를 경계로 하위 섹션(lv3/lv4)을 한 덩어리로 합친다. KCSC API가
+조문을 level 1~4의 평면 배열로 주는데, lv3/lv4를 낱개로 청킹하면 문맥 없는 미니청크가
+되기 때문이다. 너무 짧은 그룹은 다음 그룹에 병합하고, CHUNK_SIZE 초과 시 분할한다.
+
+청크 ID는 '{codeType}{code}__c{idx:04d}'로 문서 단위 키를 유지해 기존 증분 유틸
+(get_all_title_keys, update_dense_incremental)을 그대로 재사용한다. 인용 그래프 노드는
+청크보다 세밀한 조문 단위(lv3/lv4 label)로 두되, node_to_chunks가 부모 lv2 청크를
+가리키도록 매핑해 1-hop 확장이 올바른 청크를 찾게 한다.
 """
 
 import asyncio
@@ -28,7 +34,7 @@ from crawler.bm25_index import build_and_save, get_all_title_keys, load_bm25
 from crawler.dense_index import load_dense, update_dense_incremental
 from crawler.kcsc_api import (
     CodeMeta, KcscApiClient, Section,
-    extract_citations, sections_to_markdown,
+    extract_citations,
 )
 
 logger = logging.getLogger(__name__)
@@ -37,19 +43,13 @@ _CONCURRENCY = 5
 
 
 def _cache_dir() -> Path:
-    p = Path("./data/kcsc")
-    p.mkdir(parents=True, exist_ok=True)
-    return p
-
-
-def _md_dir() -> Path:
-    p = Path(settings.markdown_path) / "kcsc"
+    p = Path(settings.kcsc_data_path) / "cache"
     p.mkdir(parents=True, exist_ok=True)
     return p
 
 
 def _graph_path() -> Path:
-    p = Path(settings.bm25_path)
+    p = Path(settings.kcsc_data_path)
     p.mkdir(parents=True, exist_ok=True)
     return p / f"{settings.kcsc_bm25_collection}_graph.pkl"
 
@@ -76,22 +76,35 @@ class BuildResult:
 
 # ── Phase 1: API → JSON 캐시 ───────────────────────────────────────────────────
 
-def _cache_file(meta: CodeMeta) -> Path:
-    return _cache_dir() / f"{meta.code_type}_{meta.code}.json"
+def _date_prefix(update_date: str) -> str:
+    """ISO datetime 문자열 → YYYYMMDD 문자열. 예: '2025-12-29T14:48:25' → '20251229'."""
+    return update_date[:10].replace("-", "") if update_date else ""
+
+
+def _find_cache_file(meta: CodeMeta) -> Path | None:
+    """기존 캐시 파일 위치: data/kcsc/{YYYYMMDD}_{doc_key}.json"""
+    matches = list(_cache_dir().glob(f"*_{meta.doc_key}.json"))
+    return matches[0] if matches else None
+
+
+def _new_cache_path(meta: CodeMeta) -> Path:
+    """새 캐시 파일 경로: data/kcsc/{YYYYMMDD}_{doc_key}.json"""
+    return _cache_dir() / f"{_date_prefix(meta.update_date)}_{meta.doc_key}.json"
 
 
 def _load_cached_date(meta: CodeMeta) -> str | None:
-    f = _cache_file(meta)
-    if not f.exists():
+    """캐시 파일명에서 날짜(YYYYMMDD)를 읽습니다. 파일이 없으면 None."""
+    f = _find_cache_file(meta)
+    if f is None:
         return None
-    try:
-        return json.loads(f.read_text(encoding="utf-8")).get("update_date")
-    except Exception:
-        return None
+    return f.stem.split("_", 1)[0]  # "20251229_KDS111005" → "20251229"
 
 
 def _save_cache(meta: CodeMeta, sections: list[Section], known_codes: set[str]) -> None:
-    # 조문별 인용 추출 (그래프 출발 노드를 조문 단위로 두기 위함)
+    # 구버전 파일 삭제 (날짜 변경 시 파일명이 달라지므로)
+    for old in _cache_dir().glob(f"*_{meta.doc_key}.json"):
+        old.unlink()
+
     payload = {
         "code_type": meta.code_type,
         "code": meta.code,
@@ -113,12 +126,9 @@ def _save_cache(meta: CodeMeta, sections: list[Section], known_codes: set[str]) 
             for s in sections
         ],
     }
-    _cache_file(meta).write_text(
+    _new_cache_path(meta).write_text(
         json.dumps(payload, ensure_ascii=False, indent=1), encoding="utf-8"
     )
-    # 디버그/감사용 마크다운
-    md = sections_to_markdown(meta, sections)
-    (_md_dir() / f"{meta.code_type}_{meta.code}.md").write_text(md, encoding="utf-8")
 
 
 async def crawl_to_cache(
@@ -129,14 +139,16 @@ async def crawl_to_cache(
     result = CrawlResult()
     client = KcscApiClient()
     try:
-        codes = await client.fetch_code_list()
+        all_codes = await client.fetch_code_list()
+        known_codes = {c.doc_key for c in all_codes}   # 항상 전체 기준
+
+        codes = all_codes
         if code_type:
             codes = [c for c in codes if c.code_type == code_type.upper()]
-        known_codes = {c.doc_key for c in codes}
         if limit:
             codes = codes[:limit]
 
-        to_fetch = [c for c in codes if _load_cached_date(c) != c.update_date]
+        to_fetch = [c for c in codes if _load_cached_date(c) != _date_prefix(c.update_date)]
         result.skipped_fresh = len(codes) - len(to_fetch)
         print(
             f"\n[크롤 계획]  대상 {len(codes)}건  →  "
@@ -180,23 +192,25 @@ async def crawl_to_cache(
 
 # ── Phase 2: JSON 캐시 → BM25 + Dense + 그래프 ─────────────────────────────────
 
-def _iter_caches(code_type: str | None = None):
+def _iter_caches():
     for f in sorted(_cache_dir().glob("*.json")):
         try:
             data = json.loads(f.read_text(encoding="utf-8"))
         except Exception:
             logger.warning("캐시 파싱 실패, 스킵: %s", f.name)
             continue
-        if code_type and data.get("code_type") != code_type.upper():
-            continue
         yield data
 
 
-def build_from_cache(code_type: str | None = None) -> BuildResult:
-    """JSON 캐시에서 BM25/Dense/그래프 인덱스를 빌드합니다."""
+def build_from_cache() -> BuildResult:
+    """JSON 캐시 전체에서 BM25/Dense/그래프 인덱스를 빌드합니다.
+
+    BM25는 캐시 전체를 매번 통째로 재빌드하므로 부분(타입별) 빌드를 지원하지 않는다.
+    (특정 타입만 넘기면 다른 타입이 인덱스에서 사라진다.)
+    """
     col = settings.kcsc_bm25_collection
 
-    prev_bm25 = load_bm25(col)
+    prev_bm25 = load_bm25(col, base_path=settings.kcsc_data_path)
     prev_dates = get_all_title_keys(prev_bm25)  # {doc_key: datetime}
 
     all_ids: list[str] = []
@@ -213,7 +227,7 @@ def build_from_cache(code_type: str | None = None) -> BuildResult:
         node_names.setdefault(node, name)
 
     docs = 0
-    for data in _iter_caches(code_type):
+    for data in _iter_caches():
         ctype = data["code_type"]
         code = data["code"]
         name = data.get("name", "")
@@ -223,17 +237,90 @@ def build_from_cache(code_type: str | None = None) -> BuildResult:
         viewer_url = data.get("viewer_url", "")
 
         sections = data.get("sections", [])
-        # 조문 → 청크 (과대 섹션만 분할)
-        idx = 0
+        # lv2 경계로 하위 섹션을 집계해 청크 생성.
+        # lv3/lv4 낱개 섹션(5~200자)을 그대로 청킹하면 문맥 없는 미니청크가 되므로
+        # lv1/lv2 헤더를 만날 때마다 새 그룹을 열고 하위 텍스트를 모두 합친다.
+        groups: list[tuple[dict | None, list[dict]]] = []
+        cur_header: dict | None = None
+        cur_children: list[dict] = []
         for s in sections:
-            label = s.get("label", "")
-            title = s.get("title", "")
-            text = s.get("text", "")
-            body = f"{title}\n{text}".strip() if title else text
+            if s.get("level", 0) <= 2:
+                if cur_header is not None or cur_children:
+                    groups.append((cur_header, cur_children))
+                cur_header = s
+                cur_children = []
+            else:
+                cur_children.append(s)
+        if cur_header is not None or cur_children:
+            groups.append((cur_header, cur_children))
+
+        # 너무 짧은 그룹은 다음 그룹의 앞에 병합한다.
+        # (lv1 헤더만 있는 그룹, "기호의 정의\n내용 없음" 등)
+        _MIN_CHUNK = 60
+        merged: list[tuple[dict | None, list[dict]]] = []
+        pending_prefix: list[str] = []   # 앞 그룹에서 넘어온 짧은 텍스트 조각
+        for hdr, children in groups:
+            parts: list[str] = []
+            if hdr:
+                h = f"{hdr.get('title','')}\n{hdr.get('text','')}".strip()
+                if h:
+                    parts.append(h)
+            for c in children:
+                t = c.get("text", "").strip()
+                if t:
+                    parts.append(t)
+            body = "\n".join(parts).strip()
+            if len(body) < _MIN_CHUNK:
+                # 짧으면 다음 그룹 앞에 붙일 prefix로 쌓아둔다
+                pending_prefix.append(body)
+            else:
+                if pending_prefix:
+                    # 쌓아둔 짧은 텍스트를 이 그룹의 첫 자식으로 주입
+                    prefix_sec = {"label": "", "level": 9,
+                                  "title": "", "text": "\n".join(pending_prefix)}
+                    merged.append((hdr, [prefix_sec] + children))
+                    pending_prefix = []
+                else:
+                    merged.append((hdr, children))
+        # 마지막까지 남은 prefix는 마지막 그룹에 붙이거나 독립 그룹으로
+        if pending_prefix:
+            if merged:
+                last_hdr, last_children = merged[-1]
+                suffix_sec = {"label": "", "level": 9,
+                              "title": "", "text": "\n".join(pending_prefix)}
+                merged[-1] = (last_hdr, last_children + [suffix_sec])
+            else:
+                merged.append((None, [{"label": "", "level": 9, "title": "",
+                                       "text": "\n".join(pending_prefix)}]))
+
+        idx = 0
+        for (hdr, children) in merged:
+            # ── 집계 텍스트 구성 ──────────────────────────────────────
+            parts: list[str] = []
+            hdr_label = hdr.get("label", "") if hdr else ""
+            hdr_title = hdr.get("title", "") if hdr else ""
+            hdr_node = f"{ctype}:{code}:{hdr_label}" if hdr_label else doc_node
+
+            if hdr:
+                header_body = f"{hdr_title}\n{hdr.get('text','') }".strip()
+                if header_body:
+                    parts.append(header_body)
+
+            child_nodes: list[tuple[str, list[str]]] = []  # (node_id, citations)
+            for c in children:
+                t = c.get("text", "").strip()
+                if t:
+                    parts.append(t)
+                cl = c.get("label", "")
+                cn = f"{ctype}:{code}:{cl}" if cl else hdr_node
+                child_nodes.append((cn, c.get("citations", [])))
+
+            body = "\n".join(parts).strip()
             if not body:
                 continue
+
+            # ── 청크 저장 ─────────────────────────────────────────────
             pieces = [body] if len(body) <= CHUNK_SIZE else _split_fixed(body)
-            section_node = f"{ctype}:{code}:{label}" if label else doc_node
             for piece in pieces:
                 cid = chunk_id(doc_key, idx)
                 all_ids.append(cid)
@@ -241,30 +328,36 @@ def build_from_cache(code_type: str | None = None) -> BuildResult:
                 all_metadatas.append({
                     "title": name,
                     "url": viewer_url,
-                    "pub_date": update_date,   # 증분 유틸 호환 (updateDate)
+                    "pub_date": update_date,
                     "code_type": ctype,
                     "code": code,
                     "full_code": data.get("full_code", ""),
                     "version": data.get("version", ""),
-                    "section_label": label,
-                    "section_title": title,
-                    "level": s.get("level", 0),
+                    "section_label": hdr_label,
+                    "section_title": hdr_title,
+                    "level": hdr.get("level", 0) if hdr else 0,
                     "chunk_index": idx,
-                    "node_id": section_node,
+                    "node_id": hdr_node,
                 })
-                disp = f"{ctype} {code} {name}" + (f" §{label}" if label else "")
-                _add_node_chunk(section_node, cid, disp)
-                if section_node != doc_node:
-                    _add_node_chunk(doc_node, cid, f"{ctype} {code} {name}")
+                disp = f"{ctype} {code} {name}" + (f" §{hdr_label}" if hdr_label else "")
+                _add_node_chunk(hdr_node, cid, disp)
+                # 하위 노드도 이 청크를 가리키도록 등록
+                for cn, _ in child_nodes:
+                    if cn != hdr_node:
+                        _add_node_chunk(cn, cid, disp)
+                _add_node_chunk(doc_node, cid, f"{ctype} {code} {name}")
                 idx += 1
 
-            # 조문 단위 인용 엣지: 이 조문 노드 → 인용 대상 노드들
-            cites = s.get("citations", [])
-            if cites:
-                bucket = edges.setdefault(section_node, [])
-                for tgt in cites:
-                    if tgt not in bucket:
-                        bucket.append(tgt)
+            # ── 인용 엣지: hdr_node에 헤더+자식 인용을 모두 집계 ──────
+            # hdr_node(lv2) 단위로 인용을 집계하면, 검색 시 BM25 메타의
+            # node_id(hdr_node)만으로 해당 청크 전체의 인용을 조회할 수 있다.
+            chunk_cites: list[str] = list(hdr.get("citations", []) if hdr else [])
+            for _, cites in child_nodes:
+                chunk_cites.extend(cites)
+            for cite in chunk_cites:
+                edges.setdefault(hdr_node, [])
+                if cite not in edges[hdr_node]:
+                    edges[hdr_node].append(cite)
 
         if update_date:
             try:
@@ -278,7 +371,8 @@ def build_from_cache(code_type: str | None = None) -> BuildResult:
         return BuildResult()
 
     logger.info("BM25 빌드: %d문서 %d청크", docs, len(all_ids))
-    build_and_save(all_ids, all_corpus, all_metadatas, collection=col)
+    build_and_save(all_ids, all_corpus, all_metadatas, collection=col,
+                   base_path=settings.kcsc_data_path)
 
     # 그래프 저장
     graph = KcscGraph(edges=edges, node_to_chunks=node_to_chunks, node_names=node_names)
@@ -290,7 +384,7 @@ def build_from_cache(code_type: str | None = None) -> BuildResult:
 
     # Dense 증분 갱신
     if settings.deepinfra_api_key:
-        prev_dense = load_dense(col)
+        prev_dense = load_dense(col, base_path=settings.kcsc_data_path)
         dense_keys = (
             {cid.rsplit("__c", 1)[0] for cid in prev_dense.ids} if prev_dense else set()
         )
@@ -309,7 +403,8 @@ def build_from_cache(code_type: str | None = None) -> BuildResult:
 
         if add_ids or remove_keys:
             logger.info("Dense 증분: 임베딩 %d청크, 제거 키 %d", len(add_ids), len(remove_keys))
-            update_dense_incremental(remove_keys, add_ids, add_corpus, collection=col)
+            update_dense_incremental(remove_keys, add_ids, add_corpus, collection=col,
+                                     base_path=settings.kcsc_data_path)
         else:
             logger.info("Dense 변경 없음")
     else:
@@ -337,6 +432,6 @@ def load_graph() -> KcscGraph | None:
 # ── 편의 함수 ──────────────────────────────────────────────────────────────────
 
 async def sync(code_type: str | None = None, limit: int | None = None) -> BuildResult:
-    """crawl_to_cache + build_from_cache 순차 실행."""
+    """crawl_to_cache(부분 크롤 가능) + build_from_cache(항상 전체 빌드) 순차 실행."""
     await crawl_to_cache(code_type=code_type, limit=limit)
-    return build_from_cache(code_type=code_type)
+    return build_from_cache()

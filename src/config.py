@@ -7,12 +7,10 @@ class Settings(BaseSettings):
     # 법제처 API 키: 서버 기본값 (없으면 요청별 URL 파라미터 law_oc 필수)
     law_oc_default: str = ""
 
-    # BM25 인덱스
-    bm25_path: str = "./data/bm25"
+    # LH 규정 인덱스 / 마크다운 경로
+    bm25_path: str = "./data/lh_regulation"
     bm25_collection: str = "lh_regulations"
-
-    # 변환된 마크다운 캐시 경로
-    markdown_path: str = "./data/markdown"
+    markdown_path: str = "./data/lh_regulation/markdown"
 
     # LH 크롤링
     lh_regulations_url: str = "https://www.lh.or.kr/board.es?mid=a10108020000&bid=0055"
@@ -28,6 +26,7 @@ class Settings(BaseSettings):
     # KCSC 건설기준 (국가건설기준센터 Open API)
     kcsc_api_key: str = ""
     kcsc_api_base: str = "https://kcsc.re.kr/OpenApi"
+    kcsc_data_path: str = "./data/kcsc"
     kcsc_bm25_collection: str = "kcsc_standards"
 
     # MCP 서버 인증
