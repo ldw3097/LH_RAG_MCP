@@ -17,7 +17,6 @@ LAW_PORTAL_BASE = "https://www.law.go.kr"
 
 PREC_DETAIL_K = 5  # 요지까지 조회할 상위 건수
 
-_IMG_TAG_RE = re.compile(r"<img[^>]*>(?:</img>)?", re.IGNORECASE)
 _TAG_RE = re.compile(r"<[^>]+>")
 
 

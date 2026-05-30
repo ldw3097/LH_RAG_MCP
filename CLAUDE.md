@@ -109,7 +109,7 @@ data/
     kcsc_standards.pkl        ← KCSC BM25 인덱스
     kcsc_standards_dense.pkl  ← KCSC Dense 인덱스
     kcsc_standards_graph.pkl  ← 인용 그래프 (노드·엣지·청크 매핑)
-docs/  ← 구현 계획, 참고할 지식
+docs/  ← 구현 전략, 참고할 지식
 ```
 
 KCSC 청킹: lv1/lv2 헤더를 경계로 하위 섹션(lv3/lv4)을 합산. 60자 미만 그룹은 다음 그룹에 병합.

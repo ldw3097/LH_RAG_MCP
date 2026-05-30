@@ -69,7 +69,7 @@ class LHVectorSource(SearchSource):
             return []
 
     async def search(self, query: str, keywords: str) -> list[SearchResult]:
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, self._ensure_loaded)
 
         if not self._bm25:

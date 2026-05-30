@@ -76,4 +76,5 @@ https://lh-rag-mcp.fly.dev/mcp?law_oc=법제처키
 | ⚖️ `search_precedents` | 법원 판례 (판시사항 · 판결요지 · 참조조문) | "토지수용 보상금 증액 판례 있어?" |
 
 
-
+## 🖥️ 개발 참고사항
+아키텍쳐, 구현 전략 등은 CLAUDE.md, docs/ 폴더를 참고해주세요.

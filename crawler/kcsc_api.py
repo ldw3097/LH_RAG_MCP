@@ -11,7 +11,7 @@ LH 규정과 달리 KCSC는 공식 Open API(JSON)를 제공하므로 크롤링/P
 import logging
 import re
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 import httpx
