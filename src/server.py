@@ -1,4 +1,3 @@
-import asyncio
 import logging
 
 from fastmcp import FastMCP
@@ -8,13 +7,14 @@ from starlette.responses import JSONResponse
 
 from src.config import settings
 from src.context import law_oc_var
-from src.sources.base import SearchResult
 from src.sources.law_api import LawApiSource
 from src.sources.lh_vector import LHVectorSource
+from src.sources.prec_api import PrecedentSource
 
 SOURCE_LABELS = {
     "law_api": "국가법령정보센터",
     "lh_vector_db": "LH 규정",
+    "prec": "법원 판례",
 }
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -24,54 +24,98 @@ mcp = FastMCP(
     name="LH RAG MCP",
     instructions=(
         "LH 임직원 업무 지원 서버입니다. "
-        "법령, LH 내부 규정·지침에 관한 질문을 search_lh_knowledge 도구로 검색하세요."
+        "대한민국 법령·행정규칙은 search_law 도구로, "
+        "LH 사내 규정(인사·보수·직제·감사·보안·문서·업무 등 임직원 적용 규정·규칙·시행세칙)은 "
+        "search_lh_regulations 도구로 검색하세요. "
+        "법원 판례는 search_precedents 도구로 키워드 검색하세요. "
+        "두 도구 모두 자연어 질의(query)와 핵심 키워드(keywords)를 함께 전달하세요. "
+        "질문이 여러 영역에 걸쳐 있으면 해당 도구들을 모두 호출하세요."
     ),
 )
 
 _sources = {
     "law_api": LawApiSource(),
     "lh_vector_db": LHVectorSource(),
+    "prec": PrecedentSource(),
 }
 
 
-@mcp.tool()
-async def search_lh_knowledge(query: str) -> str:
-    """
-    질문과 관련된 법령, 판례, LH 규정 등을 통합 검색합니다.
+async def _search_single(source_id: str, query: str, keywords: str) -> str:
+    """단일 소스를 검색해 포맷된 결과 문자열을 반환합니다."""
+    logger.info("검색 요청 [%s]: query=%s | keywords=%s", source_id, query, keywords)
+    try:
+        results = await _sources[source_id].search(query, keywords)
+    except Exception as e:
+        logger.error("소스 %s 검색 오류: %s", source_id, e)
+        return "검색 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
 
-    국가법령정보센터(법령·시행령·판례·행정규칙)와 LH 내부 규정집을 검색하여
-    관련 정보를 반환합니다.
-
-    Args:
-        query: 사용자의 요약된 질의 내용
-    """
-    logger.info("검색 요청: %s", query)
-
-    # 모든 소스를 동시에 검색
-    tasks = {sid: src.search(query) for sid, src in _sources.items()}
-    search_results = await asyncio.gather(*tasks.values(), return_exceptions=True)
-
-    # 소스별 결과 수집
-    source_results: dict[str, list] = {}
-    for sid, result in zip(tasks.keys(), search_results):
-        if isinstance(result, Exception):
-            logger.error("소스 %s 검색 오류: %s", sid, result)
-            continue
-        if result:
-            source_results[sid] = result
-
-    if not source_results:
+    if not results:
         return "관련 정보를 찾지 못했습니다. 다른 키워드로 다시 질문해 주세요."
 
-    # 소스별 결과를 순서대로 이어붙임 (law_api → lh_vector_db)
-    merged: list[SearchResult] = []
-    for results in source_results.values():
-        merged.extend(results)
-    logger.info("검색 완료: %d개 결과 (소스: %s)", len(merged), list(source_results.keys()))
+    label = SOURCE_LABELS.get(source_id, source_id)
+    logger.info("검색 완료 [%s]: %d개 결과", source_id, len(results))
+    lines = [f"검색어: {query}", f"키워드: {keywords}", f"검색 소스: {label}", ""]
+    for i, r in enumerate(results, 1):
+        lines.append(f"[{i}] [{label}] {r.to_text()}")
+    return "\n".join(lines)
 
-    lines = [f"검색어: {query}", f"검색 소스: {', '.join(source_results.keys())}", ""]
-    for i, r in enumerate(merged, 1):
-        label = SOURCE_LABELS.get(r.source_id, r.source_id)
+
+@mcp.tool()
+async def search_law(query: str, keywords: str) -> str:
+    """
+    국가법령정보센터에서 법령(법률·시행령·시행규칙) 조문과 행정규칙(고시·훈령·예규)을 검색합니다.
+
+    대한민국 법령과 국토교통부 행정규칙에 관한 질문에 사용하세요. LH 내규가 아닌
+    국가 차원의 법령·규칙이 필요할 때 적합합니다.
+
+    Args:
+        query: 자연어로 요약한 질의 (예: "전세 보증금을 못 돌려받을 때 임차인 보호").
+        keywords: 핵심 키워드를 공백으로 구분 (예: "주택임대차보호법 보증금 우선변제").
+    """
+    return await _search_single("law_api", query, keywords)
+
+
+@mcp.tool()
+async def search_lh_regulations(query: str, keywords: str) -> str:
+    """
+    LH(한국토지주택공사) 사내 규정을 검색합니다.
+
+    인사·보수·채용·교육·직제(조직)·감사·보안·문서/기록물/정보화/데이터 관리·물품·
+    소송·경영·개발사업 등 LH 임직원에게 적용되는 내부 규정·규칙·시행세칙·취업규칙을
+    검색합니다. 사내 업무 절차·복무·조직 운영에 관한 질문에 사용하세요.
+    (국가 법령이 아닌 LH 자체 내규이며, 임대주택 신청 등 대외 정책 안내가 아닙니다.)
+
+    Args:
+        query: 자연어로 요약한 질의.
+        keywords: 핵심 키워드를 공백으로 구분.
+    """
+    return await _search_single("lh_vector_db", query, keywords)
+
+
+@mcp.tool()
+async def search_precedents(keywords: str) -> str:
+    """
+    법원 판례를 키워드로 검색합니다. 판시사항·판결요지·참조조문 중심으로 반환합니다.
+
+    쟁점·사실관계 키워드로 자유롭게 검색할 수 있습니다.
+    키워드는 공백 구분 AND 매칭입니다.
+
+    Args:
+        keywords: 검색할 키워드를 공백으로 구분 (예: "보증금 우선변제", "주택임대차보호법 제3조").
+            search_law 결과의 법령명·조문번호를 포함하면 해당 법령을 인용한 판례를 찾을 수 있습니다.
+    """
+    logger.info("검색 요청 [prec]: keywords=%s", keywords)
+    try:
+        results = await _sources["prec"].search("", keywords)
+    except Exception as e:
+        logger.error("소스 prec 검색 오류: %s", e)
+        return "검색 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
+    if not results:
+        return "관련 판례를 찾지 못했습니다. 다른 키워드로 다시 질문해 주세요."
+    label = SOURCE_LABELS["prec"]
+    logger.info("검색 완료 [prec]: %d개 결과", len(results))
+    lines = [f"키워드: {keywords}", f"검색 소스: {label}", ""]
+    for i, r in enumerate(results, 1):
         lines.append(f"[{i}] [{label}] {r.to_text()}")
     return "\n".join(lines)
 
