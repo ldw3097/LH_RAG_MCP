@@ -64,81 +64,16 @@ https://lh-rag-mcp.fly.dev/mcp?law_oc=법제처키
 
 ---
 
-## 🗂️ 코드 구조
+## 🛠️ 사용 가능한 도구
 
-### 프로젝트 파일 구성
-
-```
-src/
-├── server.py           # FastMCP 앱, 미들웨어, search_lh_knowledge 툴 정의
-├── config.py           # 환경변수 설정 (pydantic-settings)
-├── context.py          # law_oc 키 요청별 격리 (contextvars)
-└── sources/
-    ├── base.py         # SearchResult, SearchSource 추상 클래스
-    ├── law_api.py      # 법제처 AI 검색 API (일반검색 fallback 포함)
-    └── lh_vector.py    # LH 규정 BM25 검색 (kiwipiepy 형태소 분석)
-
-crawler/
-├── lh_crawler.py       # RSS 파싱 + 페이지 크롤링 + 파일 다운로드
-├── pdf_converter.py    # PDF → 마크다운 변환 (docling, 표 구조 + OCR)
-├── indexer.py          # BM25 인덱스 증분 동기화
-├── bm25_index.py       # BM25 인덱스 빌드·저장·로드·검색
-└── rss_watcher.py      # 주기적 RSS 감시 데몬
-
-scripts/
-└── build_index.py      # LH 규정 인덱스 빌드 엔트리포인트
-
-data/
-├── markdown/           # docling 변환 캐시: {YYMMDD}_{title}.md
-└── bm25/               # BM25 인덱스: lh_regulations.pkl
-```
-
-### 🔍 검색 흐름
-
-```
-search_lh_knowledge(query)
-    │
-    ├─ 🏛️  LawApiSource.search(query)
-    │       └─ 법제처 AI검색 API (실패 시 일반검색 fallback)
-    │
-    └─ 📋  LHVectorSource.search(query)
-            └─ BM25(kiwipiepy) → pkl 파일에서 로드
-    │
-    ▼
-결과 이어붙이기 (law_api 7개 + lh_vector_db 7개)
-    │
-    ▼
-🤖 Claude에 텍스트로 반환
-```
-
-### 🔐 법제처 API 키 격리
-
-사용자마다 자신의 법제처 API 키를 MCP 서버 URL 파라미터로 전달합니다.
-
-```
-https://lh-rag-mcp.fly.dev/mcp?law_oc=USER_KEY
-```
-
-`LawOcMiddleware`가 이를 수신하여 `law_oc_var` (Python contextvars)에 저장합니다.  
-동시에 여러 사용자가 요청해도 각 요청이 **독립적인 API 키**를 사용합니다.  
-서버 공용 기본값은 `LAW_OC_DEFAULT` 환경변수로 설정합니다.
-
-### ➕ 새 검색 소스 추가
-
-1. `src/sources/base.py`의 `SearchSource`를 상속하여 `search()` 메서드 구현
-2. `src/server.py`의 `_sources` 딕셔너리에 인스턴스 추가
-
----
-
-## ⚙️ 환경변수
+질문을 하면 Claude가 내용에 맞는 도구를 **자동으로 골라** 검색합니다. 도구를 따로 지정할 필요는 없습니다.
 
 
-| 변수               | 설명                        | 기본값               |
-| ---------------- | ------------------------- | ----------------- |
-| `LAW_OC_DEFAULT` | 법제처 API 기본 키              | (없음, URL 파라미터 필수) |
-| `MCP_API_KEY`    | MCP 서버 Bearer 인증 키 (미사용중) | (없음, 인증 생략)       |
-| `LH_RSS_URL`     | LH 규정 RSS 주소              | (없음)              |
-| `BM25_PATH`      | BM25 인덱스 저장 경로            | `./data/bm25`     |
-| `MARKDOWN_PATH`  | 마크다운 캐시 경로                | `./data/markdown` |
+| 도구 | 검색 대상 | 이런 질문에 |
+| --- | --- | --- |
+| 🏛️ `search_law` | 국가법령정보센터 법령 · 국토교통부 행정규칙 | "공공임대주택 임대료 인상 상한은?" |
+| 📋 `search_lh_regulations` | LH 사내 규정 · 규칙 · 시행세칙 | "해외 출장 일비·숙박비 지급 기준은?" |
+| ⚖️ `search_precedents` | 법원 판례 (판시사항 · 판결요지 · 참조조문) | "토지수용 보상금 증액 판례 있어?" |
+
 
 

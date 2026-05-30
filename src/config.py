@@ -25,6 +25,11 @@ class Settings(BaseSettings):
     deepinfra_api_key: str = ""
     embedding_model: str = "Qwen/Qwen3-Embedding-0.6B"
 
+    # KCSC 건설기준 (국가건설기준센터 Open API)
+    kcsc_api_key: str = ""
+    kcsc_api_base: str = "https://kcsc.re.kr/OpenApi"
+    kcsc_bm25_collection: str = "kcsc_standards"
+
     # MCP 서버 인증
     mcp_api_key: str = ""
     host: str = "0.0.0.0"

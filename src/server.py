@@ -9,11 +9,13 @@ from src.config import settings
 from src.context import law_oc_var
 from src.sources.law_api import LawApiSource
 from src.sources.lh_vector import LHVectorSource
+from src.sources.kcsc_vector import KCSCVectorSource
 from src.sources.prec_api import PrecedentSource
 
 SOURCE_LABELS = {
     "law_api": "국가법령정보센터",
     "lh_vector_db": "LH 규정",
+    "kcsc_vector_db": "건설기준(KDS/KCS/LHCS)",
     "prec": "법원 판례",
 }
 
@@ -28,7 +30,9 @@ mcp = FastMCP(
         "LH 사내 규정(인사·보수·직제·감사·보안·문서·업무 등 임직원 적용 규정·규칙·시행세칙)은 "
         "search_lh_regulations 도구로 검색하세요. "
         "법원 판례는 search_precedents 도구로 키워드 검색하세요. "
-        "두 도구 모두 자연어 질의(query)와 핵심 키워드(keywords)를 함께 전달하세요. "
+        "건설기준(KDS 설계기준·KCS 표준시방서·LHCS LH 전문시방서)은 "
+        "search_construction_standards 도구로 검색하세요. "
+        "검색 도구는 자연어 질의(query)와 핵심 키워드(keywords)를 함께 전달하세요. "
         "질문이 여러 영역에 걸쳐 있으면 해당 도구들을 모두 호출하세요."
     ),
 )

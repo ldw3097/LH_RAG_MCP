@@ -16,22 +16,27 @@ python -m src.server            # MCP 서버 실행 (또는 lh-rag-mcp)
 ```
 search_law(query, keywords)            → 법제처 AI검색(법령) + admrul(국토부 행정규칙) → Claude
 search_lh_regulations(query, keywords) → LH 규정 BM25(keywords)+Dense(query) RRF       → Claude
+search_precedents(keywords)            → 법제처 판례검색(prec) 상위 N건 요지 조회        → Claude
 ```
 
-- MCP 도구 2개. Claude가 질문 성격에 맞게 선택(또는 둘 다 호출)한다.
-- 두 도구 모두 `query`(자연어 — AI검색·Dense)와 `keywords`(키워드 — 일반검색·BM25·admrul)를 받는다.
+- MCP 도구 3개. Claude가 질문 성격에 맞게 선택(또는 여러 개 호출)한다.
+- `search_law`/`search_lh_regulations`는 `query`(자연어 — AI검색·Dense)와 `keywords`(키워드 — 일반검색·BM25·admrul)를 받는다.
 - `search_law`: 법령(aiSearch, query) + 국토교통부 행정규칙(admrul, keywords, 상위 N건 본문 조회) concat.
-  AI검색 실패 시 키워드 일반검색 fallback. 판례는 미지원(향후 별도 툴).
+  AI검색 실패 시 키워드 일반검색 fallback.
+- `search_precedents`: `keywords`만 받는다(판례 API는 키워드 AND 매칭). 상위 N건의 판시사항·판결요지·
+  참조조문·참조판례를 조회(전문 제외). 결과 0건이면 첫 번째 키워드만으로 자동 재시도하므로,
+  핵심 키워드를 맨 앞에 두고 최대 2개로 주는 것이 좋다.
 
 ## 파일 지도
 
 | 파일 | 역할 |
 |---|---|
-| `src/server.py` | FastMCP 앱, 미들웨어, `search_law`·`search_lh_regulations` 툴 |
+| `src/server.py` | FastMCP 앱, 미들웨어, `search_law`·`search_lh_regulations`·`search_precedents` 툴 |
 | `src/config.py` | 환경변수 (pydantic-settings) |
 | `src/context.py` | `law_oc_var` — 요청별 법제처 API 키 격리 (contextvars) |
 | `src/sources/law_api.py` | 법령(AI검색→일반검색 fallback) + 국토부 행정규칙(admrul+본문) |
 | `src/sources/lh_vector.py` | BM25(keywords)+Dense(query) 하이브리드, RRF 결합, 결과 7개 |
+| `src/sources/prec_api.py` | 법제처 판례(prec) 검색 + 상위 N건 요지(판시사항·판결요지·참조조문·참조판례) 조회 |
 | `src/sources/base.py` | `SearchResult`, `SearchSource` 추상 클래스 |
 | `crawler/lh_crawler.py` | RSS 파싱 + LH 사이트 크롤링 + 파일 다운로드 |
 | `crawler/pdf_converter.py` | PDF → 마크다운 변환 (docling, 표 구조 + OCR) |
@@ -45,6 +50,18 @@ search_lh_regulations(query, keywords) → LH 규정 BM25(keywords)+Dense(query)
 1. `src/sources/` 에 `SearchSource` 상속 클래스 작성 (`search(query, keywords)` 구현)
 2. `src/server.py` `_sources` 딕셔너리에 인스턴스 추가
 3. `src/server.py` 에 `@mcp.tool()` 함수 추가 (`_search_single(source_id, query, keywords)` 호출)
+   - 단일 파라미터 툴은 `_search_single`을 우회해 직접 호출 가능 (예: `search_precedents`는 `keywords`만 받음)
+
+## 테스트
+
+MCP Inspector로 도구를 직접 호출해 확인한다:
+
+```bash
+npx @modelcontextprotocol/inspector python -m src.server
+```
+
+배포 서버 대상 엔드투엔드 테스트는 `https://lh-rag-mcp.fly.dev/mcp?law_oc=<키>` 에
+streamable-http(JSON-RPC)로 `initialize` → `tools/list` → `tools/call` 순으로 호출한다.
 
 ## 환경변수 (.env)
 
@@ -63,6 +80,7 @@ MARKDOWN_PATH=./data/markdown
 data/
   markdown/  ← docling 변환 캐시: {YYMMDD}_{title_key}.md
   bm25/      ← BM25 인덱스: lh_regulations.pkl
+docs/  ← 구현 계획, 참고할 지식
 ```
 
 인덱스 초기화:
