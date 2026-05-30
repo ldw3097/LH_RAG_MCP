@@ -42,6 +42,12 @@ class PrecedentSource(SearchSource):
         kw = keywords or query
         items = await self._prec_search(kw)
         if not items:
+            # 결과 없으면 첫 번째 키워드만으로 재시도
+            first_kw = kw.split()[0]
+            if first_kw != kw:
+                logger.info("판례 검색 결과 없음, 첫 키워드로 재시도: %s", first_kw)
+                items = await self._prec_search(first_kw)
+        if not items:
             return []
         contents = await asyncio.gather(
             *(self._fetch_prec_detail(it["id"]) for it in items),
