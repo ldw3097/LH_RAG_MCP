@@ -5,8 +5,9 @@ primary_region = 'nrt'  # Tokyo — 한국에서 가장 가까운 fly.io 리전
   dockerfile = 'Dockerfile'
 
 [env]
-  BM25_PATH       = '/data/bm25'
-  MARKDOWN_PATH   = '/data/markdown'
+  BM25_PATH       = '/data/lh_regulation'
+  MARKDOWN_PATH   = '/data/lh_regulation/markdown'
+  KCSC_DATA_PATH  = '/data/kcsc'
   PORT            = '8000'
   HOST            = '0.0.0.0'
 

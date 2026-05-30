@@ -16,15 +16,23 @@ RUN uv pip install --system --no-cache \
     "python-dotenv>=1.0.0" \
     "kiwipiepy>=0.19.0" \
     "rank-bm25>=0.2.2" \
-    "numpy>=1.24.0"
+    "numpy>=1.24.0" \
+    "beautifulsoup4>=4.12.0"
 
 COPY src/ src/
+COPY crawler/__init__.py crawler/__init__.py
 COPY crawler/bm25_index.py crawler/bm25_index.py
 COPY crawler/dense_index.py crawler/dense_index.py
+COPY crawler/indexer.py crawler/indexer.py
+COPY crawler/kcsc_api.py crawler/kcsc_api.py
+COPY crawler/kcsc_indexer.py crawler/kcsc_indexer.py
+COPY crawler/lh_crawler.py crawler/lh_crawler.py
 
-RUN mkdir -p /data/bm25 /data/markdown
+RUN mkdir -p /data/lh_regulation /data/kcsc
 
-ENV MARKDOWN_PATH=/data/markdown
+ENV MARKDOWN_PATH=/data/lh_regulation/markdown
+ENV BM25_PATH=/data/lh_regulation
+ENV KCSC_DATA_PATH=/data/kcsc
 ENV HOST=0.0.0.0
 ENV PORT=8000
 
