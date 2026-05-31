@@ -18,7 +18,7 @@ from crawler.kcsc_indexer import KcscGraph, load_graph
 
 logger = logging.getLogger(__name__)
 
-KCSC_TOP_K_PRIMARY = 5   # 1차 하이브리드 검색 반환 수
+KCSC_TOP_K_PRIMARY = 12  # 1차 하이브리드 검색 반환 수
 MAX_CITATION_HOPS = 10   # 1-hop 인용 확장 최대 청크 수
 
 

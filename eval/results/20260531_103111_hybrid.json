@@ -1,0 +1,262 @@
+{
+  "mode": "hybrid",
+  "ks": [
+    5,
+    10
+  ],
+  "n_queries": 20,
+  "summary": {
+    "lh": {
+      "recall@5": 0.3333,
+      "recall@10": 0.3333,
+      "mrr": 0.3056,
+      "ndcg@10": 0.3128
+    },
+    "kcsc": {
+      "recall@5": 0.0,
+      "recall@10": 0.0,
+      "mrr": 0.0,
+      "ndcg@10": 0.0
+    },
+    "__overall__": {
+      "recall@5": 0.3,
+      "recall@10": 0.3,
+      "mrr": 0.275,
+      "ndcg@10": 0.2815
+    }
+  },
+  "per_query": [
+    {
+      "id": "lh-01",
+      "source": "lh",
+      "found": [
+        "여비규정"
+      ],
+      "metrics": {
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr": 1.0,
+        "ndcg@10": 1.0
+      }
+    },
+    {
+      "id": "lh-02",
+      "source": "lh",
+      "found": [],
+      "metrics": {
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "mrr": 0.0,
+        "ndcg@10": 0.0
+      }
+    },
+    {
+      "id": "lh-03",
+      "source": "lh",
+      "found": [
+        "인사규정"
+      ],
+      "metrics": {
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr": 0.5,
+        "ndcg@10": 0.6309297535714575
+      }
+    },
+    {
+      "id": "lh-04",
+      "source": "lh",
+      "found": [],
+      "metrics": {
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "mrr": 0.0,
+        "ndcg@10": 0.0
+      }
+    },
+    {
+      "id": "lh-05",
+      "source": "lh",
+      "found": [
+        "인사규정"
+      ],
+      "metrics": {
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr": 1.0,
+        "ndcg@10": 1.0
+      }
+    },
+    {
+      "id": "lh-06",
+      "source": "lh",
+      "found": [],
+      "metrics": {
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "mrr": 0.0,
+        "ndcg@10": 0.0
+      }
+    },
+    {
+      "id": "lh-07",
+      "source": "lh",
+      "found": [],
+      "metrics": {
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "mrr": 0.0,
+        "ndcg@10": 0.0
+      }
+    },
+    {
+      "id": "lh-08",
+      "source": "lh",
+      "found": [],
+      "metrics": {
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "mrr": 0.0,
+        "ndcg@10": 0.0
+      }
+    },
+    {
+      "id": "lh-09",
+      "source": "lh",
+      "found": [
+        "기록물관리규정"
+      ],
+      "metrics": {
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr": 1.0,
+        "ndcg@10": 1.0
+      }
+    },
+    {
+      "id": "lh-10",
+      "source": "lh",
+      "found": [],
+      "metrics": {
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "mrr": 0.0,
+        "ndcg@10": 0.0
+      }
+    },
+    {
+      "id": "lh-11",
+      "source": "lh",
+      "found": [
+        "임원보수규정"
+      ],
+      "metrics": {
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr": 1.0,
+        "ndcg@10": 1.0
+      }
+    },
+    {
+      "id": "lh-12",
+      "source": "lh",
+      "found": [],
+      "metrics": {
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "mrr": 0.0,
+        "ndcg@10": 0.0
+      }
+    },
+    {
+      "id": "lh-13",
+      "source": "lh",
+      "found": [],
+      "metrics": {
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "mrr": 0.0,
+        "ndcg@10": 0.0
+      }
+    },
+    {
+      "id": "lh-14",
+      "source": "lh",
+      "found": [
+        "물품관리규정"
+      ],
+      "metrics": {
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr": 1.0,
+        "ndcg@10": 1.0
+      }
+    },
+    {
+      "id": "lh-15",
+      "source": "lh",
+      "found": [],
+      "metrics": {
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "mrr": 0.0,
+        "ndcg@10": 0.0
+      }
+    },
+    {
+      "id": "lh-16",
+      "source": "lh",
+      "found": [],
+      "metrics": {
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "mrr": 0.0,
+        "ndcg@10": 0.0
+      }
+    },
+    {
+      "id": "lh-17",
+      "source": "lh",
+      "found": [],
+      "metrics": {
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "mrr": 0.0,
+        "ndcg@10": 0.0
+      }
+    },
+    {
+      "id": "lh-18",
+      "source": "lh",
+      "found": [],
+      "metrics": {
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "mrr": 0.0,
+        "ndcg@10": 0.0
+      }
+    },
+    {
+      "id": "kcsc-01",
+      "source": "kcsc",
+      "found": [],
+      "metrics": {
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "mrr": 0.0,
+        "ndcg@10": 0.0
+      }
+    },
+    {
+      "id": "kcsc-02",
+      "source": "kcsc",
+      "found": [],
+      "metrics": {
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "mrr": 0.0,
+        "ndcg@10": 0.0
+      }
+    }
+  ]
+}

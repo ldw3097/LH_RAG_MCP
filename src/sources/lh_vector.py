@@ -11,8 +11,8 @@ from crawler.dense_index import DenseStore, load_dense, embed_query, dense_searc
 logger = logging.getLogger(__name__)
 
 TOP_K_CANDIDATES = 20  # BM25·Dense 각각 후보 수
-TOP_K_FINAL = 7        # RRF 최종 반환 수
-RRF_K = 60             # RRF 상수
+TOP_K_FINAL = 12       # RRF 최종 반환 수
+RRF_K = 20             # RRF 상수
 
 
 def _rrf(
