@@ -38,6 +38,8 @@ mcp = FastMCP(
         "search_procurement_interpretations 도구로 검색하세요. "
         "검색 도구는 자연어 질의(query)와 핵심 키워드(keywords)를 함께 전달하세요. "
         "질문이 여러 영역에 걸쳐 있으면 해당 도구들을 모두 호출하세요. "
+        "search_law로 목차를 확인한 뒤 특정 조문 전문이 필요하면 "
+        "get_law_article(법령) 또는 get_admrul_article(행정규칙)로 후속 조회하세요. "
         "답변 생성시 반드시 출처를 명시하세요."
     ),
 )
@@ -246,6 +248,50 @@ async def search_procurement_interpretations(query: str, keywords: str) -> str:
         keywords: 핵심 키워드를 공백으로 구분 (예: "물가변동 계약금액 조정").
     """
     return await _search_single("pps_vector_db", query, keywords)
+
+
+@mcp.tool()
+async def get_law_article(law_name: str, article: str) -> str:
+    """
+    법령의 특정 조문 전문을 조회합니다.
+
+    search_law 결과에서 확인한 법령명과 조문 번호를 입력하면 해당 조문의 전문을 반환합니다.
+    search_law로 목차를 먼저 확인한 뒤 원하는 조문을 이 툴로 상세 조회하는 2-step 플로우에 사용하세요.
+
+    Args:
+        law_name: 법령명 (예: "주택임대차보호법", "공동주택관리법 시행령")
+        article:  조문 식별자 (예: "제3조", "제7조의2")
+                  
+    """
+    logger.info("조문 조회 [law]: law_name=%s | article=%s", law_name, article)
+    try:
+        result = await _sources["law_api"].get_law_article(law_name, article)
+    except Exception as e:
+        logger.error("조문 조회 오류 [law]: %s", e)
+        return "조회 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
+    return result
+
+
+@mcp.tool()
+async def get_admrul_article(admrul_name: str, article: str) -> str:
+    """
+    행정규칙(고시·훈령·예규)의 특정 조문 전문을 조회합니다.
+
+    search_law 결과에서 확인한 행정규칙명과 조문 번호를 입력하면 해당 조문의 전문을 반환합니다.
+    search_law로 목차를 먼저 확인한 뒤 원하는 조문을 이 툴로 상세 조회하는 2-step 플로우에 사용하세요.
+
+    Args:
+        admrul_name: 행정규칙명 (예: "공동주택 관리비 등의 세부 처리기준")
+        article:     조문 식별자 (예: "제5조", "제7조의2")
+                     
+    """
+    logger.info("조문 조회 [admrul]: admrul_name=%s | article=%s", admrul_name, article)
+    try:
+        result = await _sources["law_api"].get_admrul_article(admrul_name, article)
+    except Exception as e:
+        logger.error("조문 조회 오류 [admrul]: %s", e)
+        return "조회 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
+    return result
 
 
 class ApiKeyMiddleware(BaseHTTPMiddleware):
