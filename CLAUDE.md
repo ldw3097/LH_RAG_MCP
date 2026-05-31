@@ -30,7 +30,7 @@ python -m src.server                 # MCP 서버 실행 (또는 lh-rag-mcp)
 ## 아키텍처
 
 ```
-search_law(query, keywords)                   → 법제처 AI검색(법령) + admrul(국토부 행정규칙) → Claude
+search_law(query, keywords)                   → aiSearch(법령조문+행정규칙조문) + 비법령명어제거·병렬 키워드검색(법령·행정규칙) 정확매칭재정렬 → Claude (3블록)
 search_lh_regulations(query, keywords)        → LH 규정 BM25(keywords)+Dense(query) RRF       → Claude
 search_construction_standards(query,keywords) → KCSC 건설기준 BM25+Dense RRF + 인용그래프 1-hop → Claude
 search_precedents(keywords)                   → 법제처 판례검색(prec) 상위 N건 요지 조회        → Claude
@@ -39,8 +39,10 @@ search_procurement_interpretations(query,kw)  → 조달청 해석사례 BM25(ke
 
 - MCP 도구 5개. Claude가 질문 성격에 맞게 선택(또는 여러 개 호출)한다.
 - `search_law`/`search_lh_regulations`/`search_construction_standards`는 `query`(자연어 — AI검색·Dense)와 `keywords`(키워드 — 일반검색·BM25·admrul)를 받는다.
-- `search_law`: 법령(aiSearch, query) + 국토교통부 행정규칙(admrul, keywords, 상위 N건 본문 조회) concat.
-  AI검색 실패 시 키워드 일반검색 fallback.
+- `search_law`: ① aiSearch `search=0`(법령조문)·`search=2`(행정규칙조문) 각 5건 병렬 → 조문 블록(최대 10건).
+  ② keywords에서 비법령명어(`NON_LAW_NAME_RE`) 제거본·원본을 병렬 법령 일반검색 → 합집합 → `score_law_relevance` 재정렬 → 상위 10건 본문 조회(300자) → 법령 블록.
+  ③ 같은 방식으로 국토부 행정규칙(admrul) 키워드검색 → 행정규칙 블록(300자).
+  세 블록을 분리해 반환. aiSearch·키워드검색 어느 쪽이 실패해도 나머지 블록은 유지.
 - `search_construction_standards`: KDS(설계기준)·KCS(표준시방서)·LHCS(LH 전문시방서)를 BM25+Dense
   하이브리드로 검색하고, 1차 결과 조문이 인용하는 대상 조문을 인용 그래프로 1-hop 확장해 함께 반환.
 - `search_precedents`: `keywords`만 받는다(판례 API는 키워드 AND 매칭). 상위 N건의 판시사항·판결요지·
@@ -58,7 +60,8 @@ search_procurement_interpretations(query,kw)  → 조달청 해석사례 BM25(ke
 | `src/server.py` | FastMCP 앱, 미들웨어, `search_law`·`search_lh_regulations`·`search_construction_standards`·`search_precedents`·`search_procurement_interpretations` 툴 |
 | `src/config.py` | 환경변수 (pydantic-settings) |
 | `src/context.py` | `law_oc_var` — 요청별 법제처 API 키 격리 (contextvars) |
-| `src/sources/law_api.py` | 법령(AI검색→일반검색 fallback) + 국토부 행정규칙(admrul+본문) |
+| `src/sources/law_normalize.py` | `NON_LAW_NAME_RE`·`strip_non_law_keywords`·`score_law_relevance` — 비법령명어 제거·정확매칭 점수 |
+| `src/sources/law_api.py` | aiSearch(법령+행정규칙조문) + 키워드 병렬검색(법령·행정규칙) 정확매칭재정렬·3블록 반환 |
 | `src/sources/lh_vector.py` | LH 규정 BM25(keywords)+Dense(query) 하이브리드, RRF 결합 |
 | `src/sources/kcsc_vector.py` | KCSC 건설기준 BM25+Dense 하이브리드 + 인용 그래프 1-hop 확장 |
 | `src/sources/prec_api.py` | 법제처 판례(prec) 검색 + 상위 N건 요지(판시사항·판결요지·참조조문·참조판례) 조회 |
