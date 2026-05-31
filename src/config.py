@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     # Dense 임베딩 (DeepInfra API)
     deepinfra_api_key: str = ""
     embedding_model: str = "Qwen/Qwen3-Embedding-0.6B"
+    embedding_batch_model: str = "Qwen/Qwen3-Embedding-0.6B-batch"
 
     # KCSC 건설기준 (국가건설기준센터 Open API)
     kcsc_api_key: str = ""

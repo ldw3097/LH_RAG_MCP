@@ -93,7 +93,7 @@ def build_and_save_dense(
     호출 전에 settings.deepinfra_api_key 유무를 확인하세요.
     """
     api_key = settings.deepinfra_api_key
-    model = settings.embedding_model
+    model = settings.embedding_batch_model
     if not api_key:
         raise ValueError("DEEPINFRA_API_KEY가 설정되지 않았습니다.")
 
@@ -133,7 +133,7 @@ def update_dense_incremental(
     전체 재빌드 대비 API 호출 횟수가 대폭 줄어듭니다.
     """
     api_key = settings.deepinfra_api_key
-    model = settings.embedding_model
+    model = settings.embedding_batch_model
     if not api_key:
         raise ValueError("DEEPINFRA_API_KEY가 설정되지 않았습니다.")
 
