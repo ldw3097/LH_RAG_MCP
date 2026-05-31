@@ -17,8 +17,9 @@ LAW_API_BASE = "https://www.law.go.kr/DRF"
 LAW_PORTAL_BASE = "https://www.law.go.kr"
 
 AI_SEARCH_K = 5       # aiSearch 각 타입(법령조문/행정규칙조문)별 건수
-LAW_DETAIL_K = 10     # 법령 키워드검색 본문 조회 건수
-ADMRUL_DETAIL_K = 10  # 행정규칙 키워드검색 본문 조회 건수
+LAW_DETAIL_K = 5      # 법령 키워드검색 본문 조회 건수
+ADMRUL_DETAIL_K = 5   # 행정규칙 키워드검색 본문 조회 건수
+KW_VARIANTS_MAX = 3   # 키워드 검색 변형 상한 (초과 시 HTTP fan-out 증가)
 ADMRUL_ORG_MOLIT = "1613000"  # 국토교통부 소관부처코드
 
 _IMG_TAG_RE = re.compile(r"<img[^>]*>(?:</img>)?", re.IGNORECASE)
@@ -99,7 +100,7 @@ class LawApiSource(SearchSource):
         # 법제처 일반검색은 공백 구분 AND 매칭이라 키워드가 여러 개면 0건이 되기 쉬우므로
         # 개별 토큰별로도 따로 검색해 합집합을 구한다.
         tokens = [t for t in stripped.split() if len(t) > 1]
-        kw_variants = list(dict.fromkeys([keywords, stripped] + tokens))  # 중복 제거, 순서 유지
+        kw_variants = list(dict.fromkeys([keywords, stripped] + tokens))[:KW_VARIANTS_MAX]
 
         ai0_res, ai2_res, law_res, admrul_res = await asyncio.gather(
             self._ai_search(query, search_type="0"),
