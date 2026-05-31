@@ -1,0 +1,12 @@
+[
+  {
+    "top_k_final": 7,
+    "candidates_k": 10,
+    "rrf_k": 20,
+    "score": 0.8002,
+    "recall@5": 0.8581,
+    "recall@10": 0.9459,
+    "mrr": 0.7777,
+    "ndcg@10": 0.8002
+  }
+]

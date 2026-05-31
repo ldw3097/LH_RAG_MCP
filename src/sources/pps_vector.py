@@ -20,8 +20,8 @@ logger = logging.getLogger(__name__)
 # 해석사례는 1건 = 질의+회답 전체가 평균 ~1,400자. 청크를 크게 잡아 1건 = 1청크로 유지.
 # 반환 건수는 LH/KCSC보다 적게 잡아 Claude 컨텍스트 부담을 줄인다.
 PPS_CHUNK_SIZE = 3000    # indexer에서 참조 (이 값 이하면 1청크)
-PPS_TOP_K_CANDIDATES = 10
-PPS_TOP_K_FINAL = 5
+PPS_TOP_K_CANDIDATES = 20
+PPS_TOP_K_FINAL = 12
 
 # 반환 콘텐츠 길이 제한 — 이를 초과하면 섹션 내부를 앞뒤 보존+중략으로 표시
 PPS_CONTENT_LIMIT = 2500   # 반환 콘텐츠 길이 제한, 초과 시 중략 처리
