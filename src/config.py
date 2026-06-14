@@ -39,5 +39,13 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8000
 
+    # 과다 사용 방지
+    rate_limit_per_5min: int = 30       # 5분 버킷 최대 요청 수
+    rate_limit_daily: int = 800         # 일 버킷 최대 요청 수 (자정 KST 기준 초기화)
+    max_request_body_kb: int = 100      # 요청 바디 크기 상한 (KB)
+    max_response_chars: int = 150_000   # 응답 텍스트 길이 상한 (chars)
+    trust_proxy: int = 1                # XFF 신뢰 홉 수
+    rate_limit_bypass_key: str = ""     # 설정 시 X-Rate-Limit-Bypass 헤더로 우회 가능
+
 
 settings = Settings()

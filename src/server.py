@@ -1,4 +1,6 @@
 import logging
+import time
+from datetime import datetime, timedelta, timezone
 
 from fastmcp import FastMCP
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -53,6 +55,27 @@ _sources = {
 }
 
 
+_KST = timezone(timedelta(hours=9))
+
+
+def _get_client_ip(request: Request) -> str:
+    """X-Forwarded-For에서 신뢰 홉 수(trust_proxy)에 따라 클라이언트 IP를 추출합니다."""
+    n = settings.trust_proxy
+    xff = request.headers.get("X-Forwarded-For", "")
+    if n > 0 and xff:
+        parts = [p.strip() for p in xff.split(",")]
+        idx = max(0, len(parts) - n)
+        return parts[idx]
+    return (request.client.host if request.client else None) or "unknown"
+
+
+def _truncate_response(text: str) -> str:
+    limit = settings.max_response_chars
+    if len(text) <= limit:
+        return text
+    return text[:limit] + f"\n\n...(응답이 {len(text) - limit:,}자 초과하여 잘렸습니다)"
+
+
 def _result_header(label: str, query: str, keywords: str) -> list[str]:
     return [f"검색어: {query}", f"키워드: {keywords}", f"검색 소스: {label}", ""]
 
@@ -74,7 +97,7 @@ async def _search_single(source_id: str, query: str, keywords: str) -> str:
     lines = _result_header(label, query, keywords)
     for i, r in enumerate(results, 1):
         lines.append(f"[{i}] [{label}] {r.to_text()}")
-    return "\n".join(lines)
+    return _truncate_response("\n".join(lines))
 
 
 @mcp.tool()
@@ -133,7 +156,7 @@ async def search_law(query: str, keywords: str) -> str:
         lines.append("")
 
     logger.info("검색 완료 [law_api]: %d개 결과", total)
-    return "\n".join(lines)
+    return _truncate_response("\n".join(lines))
 
 
 @mcp.tool()
@@ -196,7 +219,7 @@ async def search_construction_standards(query: str, keywords: str, category: str
     lines = _result_header(label, query, keywords)
     for i, r in enumerate(results, 1):
         lines.append(f"[{i}] [{label}] {r.to_text()}")
-    return "\n".join(lines)
+    return _truncate_response("\n".join(lines))
 
 
 @mcp.tool()
@@ -228,7 +251,7 @@ async def search_precedents(keywords: str) -> str:
     lines = [f"키워드: {keywords}", f"검색 소스: {label}", ""]
     for i, r in enumerate(results, 1):
         lines.append(f"[{i}] [{label}] {r.to_text()}")
-    return "\n".join(lines)
+    return _truncate_response("\n".join(lines))
 
 
 @mcp.tool()
@@ -269,29 +292,112 @@ async def get_law_article(law_name: str, article: str) -> str:
     except Exception as e:
         logger.error("조문 조회 오류 [law]: %s", e)
         return "조회 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
-    return result
+    return _truncate_response(result)
 
 
 @mcp.tool()
-async def get_admrul_article(admrul_name: str, article: str) -> str:
+async def get_admrul_article(admrul_name: str, article: str, ministry: str = "") -> str:
     """
     행정규칙(고시·훈령·예규)의 특정 조문 전문을 조회합니다.
 
     search_law 결과에서 확인한 행정규칙명과 조문 번호를 입력하면 해당 조문의 전문을 반환합니다.
     search_law로 목차를 먼저 확인한 뒤 원하는 조문을 이 툴로 상세 조회하는 2-step 플로우에 사용하세요.
+    소관부처를 알고 있으면 ministry에 지정하면 검색 정확도가 높아집니다.
 
     Args:
         admrul_name: 행정규칙명 (예: "공동주택 관리비 등의 세부 처리기준")
         article:     조문 식별자 (예: "제5조", "제7조의2")
-                     
+        ministry:    소관부처명 (예: "국토교통부", "행정안전부", "고용노동부", "환경부", "조달청").
+                     생략하면 전 부처 검색. search_law 결과의 소관부처를 그대로 전달하세요.
     """
-    logger.info("조문 조회 [admrul]: admrul_name=%s | article=%s", admrul_name, article)
+    logger.info("조문 조회 [admrul]: admrul_name=%s | article=%s | ministry=%s", admrul_name, article, ministry)
     try:
-        result = await _sources["law_api"].get_admrul_article(admrul_name, article)
+        result = await _sources["law_api"].get_admrul_article(admrul_name, article, ministry)
     except Exception as e:
         logger.error("조문 조회 오류 [admrul]: %s", e)
         return "조회 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
-    return result
+    return _truncate_response(result)
+
+
+class MaxBodySizeMiddleware(BaseHTTPMiddleware):
+    """Content-Length 기준으로 요청 바디 크기를 제한합니다."""
+
+    async def dispatch(self, request: Request, call_next):
+        max_bytes = settings.max_request_body_kb * 1024
+        cl = request.headers.get("content-length")
+        if cl and int(cl) > max_bytes:
+            return JSONResponse({"error": "Request body too large"}, status_code=413)
+        return await call_next(request)
+
+
+class RateLimitMiddleware(BaseHTTPMiddleware):
+    """IP당 5분 버킷·일별 버킷 두 단계 rate limit을 적용합니다."""
+
+    _EXEMPT_PATHS = {"/", "/health"}
+
+    def __init__(self, app):
+        super().__init__(app)
+        self._5min: dict[str, dict] = {}
+        self._daily: dict[str, dict] = {}
+        self._last_cleanup: float = 0.0
+
+    def _next_midnight_kst(self) -> float:
+        now_kst = datetime.now(_KST)
+        midnight = (now_kst + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+        return midnight.timestamp()
+
+    def _cleanup(self, now: float) -> None:
+        if now - self._last_cleanup < 600:
+            return
+        self._last_cleanup = now
+        for buckets in (self._5min, self._daily):
+            expired = [ip for ip, b in buckets.items() if now >= b["reset_at"]]
+            for ip in expired:
+                del buckets[ip]
+
+    async def dispatch(self, request: Request, call_next):
+        if request.url.path in self._EXEMPT_PATHS:
+            return await call_next(request)
+
+        if (
+            settings.rate_limit_bypass_key
+            and request.headers.get("X-Rate-Limit-Bypass") == settings.rate_limit_bypass_key
+        ):
+            return await call_next(request)
+
+        now = time.time()
+        self._cleanup(now)
+        ip = _get_client_ip(request)
+
+        # 5분 버킷
+        b5 = self._5min.get(ip)
+        if not b5 or now >= b5["reset_at"]:
+            b5 = {"count": 0, "reset_at": now + 300}
+            self._5min[ip] = b5
+        b5["count"] += 1
+        if b5["count"] > settings.rate_limit_per_5min:
+            retry_after = int(b5["reset_at"] - now)
+            return JSONResponse(
+                {"error": "Too many requests. Try again later.", "retry_after": retry_after},
+                status_code=429,
+                headers={"Retry-After": str(retry_after)},
+            )
+
+        # 일별 버킷
+        bd = self._daily.get(ip)
+        if not bd or now >= bd["reset_at"]:
+            bd = {"count": 0, "reset_at": self._next_midnight_kst()}
+            self._daily[ip] = bd
+        bd["count"] += 1
+        if bd["count"] > settings.rate_limit_daily:
+            retry_after = int(bd["reset_at"] - now)
+            return JSONResponse(
+                {"error": "Daily request limit exceeded. Try again tomorrow.", "retry_after": retry_after},
+                status_code=429,
+                headers={"Retry-After": str(retry_after)},
+            )
+
+        return await call_next(request)
 
 
 class ApiKeyMiddleware(BaseHTTPMiddleware):
@@ -336,9 +442,12 @@ def main():
     logger.info("BM25 인덱스 사전 로딩 완료")
 
     app = mcp.http_app(transport="streamable-http")
-    # 미들웨어는 역순으로 실행되므로 LawOc → ApiKey 순으로 등록
+    # 미들웨어는 역순으로 실행되므로 안쪽부터 등록
+    # 실행 순서: MaxBodySize → RateLimit → ApiKey → LawOc → 툴
     app.add_middleware(LawOcMiddleware)
     app.add_middleware(ApiKeyMiddleware)
+    app.add_middleware(RateLimitMiddleware)
+    app.add_middleware(MaxBodySizeMiddleware)
 
     import uvicorn
     uvicorn.run(app, host=settings.host, port=settings.port)
