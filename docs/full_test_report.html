@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LH RAG MCP 유용성 평가 보고서</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #f8f7f4;
+    --surface: #ffffff;
+    --border: rgba(0,0,0,0.08);
+    --text-primary: #1a1a18;
+    --text-secondary: #5f5e5a;
+    --text-muted: #888780;
+    --teal: #1D9E75;
+    --teal-light: #E1F5EE;
+    --teal-mid: #9FE1CB;
+    --coral: #D85A30;
+    --coral-light: #FAECE7;
+    --amber: #BA7517;
+    --amber-light: #FAEEDA;
+    --blue: #185FA5;
+    --blue-light: #E6F1FB;
+    --purple: #534AB7;
+    --purple-light: #EEEDFE;
+    --red: #A32D2D;
+    --red-light: #FCEBEB;
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Pretendard', 'Noto Sans KR', sans-serif;
+    background: var(--bg);
+    color: var(--text-primary);
+    line-height: 1.7;
+    font-size: 15px;
+  }
+  a { color: var(--teal); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  .page { max-width: 860px; margin: 0 auto; padding: 48px 24px 80px; }
+
+  /* Header */
+  .header { margin-bottom: 48px; }
+  .header-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--teal-light); color: #085041;
+    font-size: 12px; font-weight: 500; padding: 4px 12px;
+    border-radius: 99px; margin-bottom: 16px;
+  }
+  .header h1 { font-size: 28px; font-weight: 600; letter-spacing: -0.5px; margin-bottom: 10px; }
+  .header p { color: var(--text-secondary); font-size: 15px; max-width: 560px; }
+  .header-meta { display: flex; gap: 24px; margin-top: 16px; flex-wrap: wrap; }
+  .header-meta span { font-size: 13px; color: var(--text-muted); }
+  .header-meta span b { color: var(--text-secondary); font-weight: 500; }
+
+  /* Section */
+  .section { margin-bottom: 48px; }
+  .section-title {
+    font-size: 13px; font-weight: 500; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--text-muted);
+    margin-bottom: 16px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* Hero cards */
+  .hero-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  @media (max-width: 600px) { .hero-grid { grid-template-columns: 1fr; } }
+  .hero-card {
+    background: var(--surface); border-radius: var(--radius);
+    border: 1px solid var(--border); padding: 20px 24px;
+  }
+  .hero-card.highlight { background: var(--teal-light); border-color: var(--teal-mid); }
+  .hero-label { font-size: 12px; color: var(--text-muted); margin-bottom: 6px; }
+  .hero-value { font-size: 36px; font-weight: 600; letter-spacing: -1px; line-height: 1; }
+  .hero-card.highlight .hero-value { color: #085041; }
+  .hero-sub { font-size: 12px; color: var(--text-muted); margin-top: 6px; }
+
+  /* Condition legend */
+  .cond-legend { display: flex; gap: 20px; margin-bottom: 16px; }
+  .cond-pill {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13px; font-weight: 500;
+  }
+  .cond-dot { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+  .cond-desc { font-size: 12px; color: var(--text-muted); font-weight: 400; }
+
+  /* Chart card */
+  .chart-card {
+    background: var(--surface); border-radius: var(--radius);
+    border: 1px solid var(--border); padding: 24px;
+  }
+  .chart-title { font-size: 15px; font-weight: 500; margin-bottom: 4px; }
+  .chart-sub { font-size: 13px; color: var(--text-muted); margin-bottom: 20px; }
+
+  /* Two column charts */
+  .chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 640px) { .chart-row { grid-template-columns: 1fr; } }
+
+  /* Insight cards */
+  .insight-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 600px) { .insight-grid { grid-template-columns: 1fr; } }
+  .insight-card {
+    background: var(--surface); border-radius: var(--radius);
+    border: 1px solid var(--border); padding: 18px 20px;
+  }
+  .insight-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .insight-icon {
+    width: 36px; height: 36px; border-radius: var(--radius-sm);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; flex-shrink: 0;
+  }
+  .insight-cat { font-size: 14px; font-weight: 500; }
+  .insight-src { font-size: 12px; color: var(--text-muted); }
+  .insight-stat { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+  .stat-a { font-size: 13px; color: var(--text-muted); }
+  .stat-arrow { font-size: 13px; color: var(--text-muted); }
+  .stat-b { font-size: 18px; font-weight: 600; }
+  .stat-delta {
+    font-size: 12px; font-weight: 500; padding: 2px 7px;
+    border-radius: 99px;
+  }
+  .delta-pos { background: var(--teal-light); color: #085041; }
+  .delta-neg { background: var(--red-light); color: var(--red); }
+  .insight-desc { font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
+
+  /* Verdict cards */
+  .verdict-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 600px) { .verdict-row { grid-template-columns: 1fr; } }
+  .verdict-card {
+    background: var(--surface); border-radius: var(--radius);
+    border: 1px solid var(--border); padding: 20px 24px;
+  }
+  .verdict-cond { font-size: 13px; font-weight: 500; margin-bottom: 14px; color: var(--text-secondary); }
+  .verdict-bar { margin-bottom: 10px; }
+  .verdict-label { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px; }
+  .verdict-label span:first-child { color: var(--text-secondary); }
+  .verdict-label span:last-child { font-weight: 500; }
+  .bar-track { background: var(--bg); border-radius: 99px; height: 8px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 99px; }
+
+  /* Speed cards */
+  .speed-card {
+    background: var(--surface); border-radius: var(--radius);
+    border: 1px solid var(--border); padding: 20px 24px;
+  }
+
+  /* Methodology */
+  .method-box {
+    background: var(--surface); border-radius: var(--radius);
+    border: 1px solid var(--border); padding: 20px 24px;
+    font-size: 13px; color: var(--text-secondary); line-height: 1.7;
+  }
+  .method-box p + p { margin-top: 8px; }
+
+  /* Footer */
+  .footer { margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--border); font-size: 13px; color: var(--text-muted); text-align: center; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-badge">유용성 평가 보고서</div>
+    <h1>LH RAG MCP 서버 — AI 답변 정확도 비교 실험</h1>
+    <p>MCP 서버 연결 시 AI가 얼마나 더 정확하고 빠른 답변을 제공하는지 500개 실무 질문으로 검증한 결과입니다.</p>
+    <div class="header-meta">
+      <span><b>평가 기준일:</b> 2026년 6월</span>
+      <span><b>질문 수:</b> 500개 × 2조건 = 1,000건</span>
+      <span><b>채점 방식:</b> AI 블라인드 채점 (정답·부분정답·오답)</span>
+    </div>
+  </div>
+
+  <!-- 실험 방법 요약 -->
+  <div class="section">
+    <div class="section-title">이 실험은 무엇을 비교했나요?</div>
+    <div class="chart-card">
+      <div style="display:grid; grid-template-columns:1fr 40px 1fr; gap:12px; align-items:center;">
+        <div style="background:var(--coral-light); border-radius:var(--radius-sm); padding:18px 20px;">
+          <div style="font-size:13px; font-weight:500; color:#4A1B0C; margin-bottom:6px;">조건 A — 웹 검색만</div>
+          <div style="font-size:13px; color:#712B13; line-height:1.5;">MCP 없이 Claude가 인터넷 검색만으로 LH 실무 질문에 답하는 상황.<br>현재 대부분의 직원이 AI를 쓰는 방식입니다.</div>
+        </div>
+        <div style="text-align:center; color:var(--text-muted); font-size:20px;">vs</div>
+        <div style="background:var(--teal-light); border-radius:var(--radius-sm); padding:18px 20px;">
+          <div style="font-size:13px; font-weight:500; color:#04342C; margin-bottom:6px;">조건 B — MCP 서버 연결</div>
+          <div style="font-size:13px; color:#085041; line-height:1.5;">MCP를 통해 법령·LH 규정·건설기준·판례·조달청 해석사례를 자동으로 검색해 Claude가 답하는 상황.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 전체 결과 요약 -->
+  <div class="section">
+    <div class="section-title">전체 결과 요약</div>
+    <div class="hero-grid">
+      <div class="hero-card">
+        <div class="hero-label">조건 A 정답률 (웹 검색만)</div>
+        <div class="hero-value" style="color:var(--coral);">55.0%</div>
+        <div class="hero-sub">500문항 중 275개 정답</div>
+      </div>
+      <div class="hero-card highlight">
+        <div class="hero-label">조건 B 정답률 (MCP 연결)</div>
+        <div class="hero-value">88.2%</div>
+        <div class="hero-sub">500문항 중 441개 정답</div>
+      </div>
+      <div class="hero-card">
+        <div class="hero-label">MCP 연결 시 개선 폭</div>
+        <div class="hero-value" style="color:var(--teal);">+33pp</div>
+        <div class="hero-sub">응답 속도도 2배 빠름</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 카테고리별 정확도 차트 -->
+  <div class="section">
+    <div class="section-title">카테고리별 정답률 비교</div>
+    <div class="chart-card">
+      <div class="chart-title">분야별 AI 정답률</div>
+      <div class="chart-sub">100개 질문씩 5개 분야, 총 500문항 기준</div>
+      <div class="cond-legend">
+        <div class="cond-pill">
+          <div class="cond-dot" style="background:#D85A30;"></div>
+          <span>조건 A <span class="cond-desc">(웹 검색만)</span></span>
+        </div>
+        <div class="cond-pill">
+          <div class="cond-dot" style="background:#1D9E75;"></div>
+          <span>조건 B <span class="cond-desc">(MCP 연결)</span></span>
+        </div>
+      </div>
+      <div style="position:relative; height:280px;">
+        <canvas id="catAccChart" role="img" aria-label="카테고리별 정답률 비교 막대 차트. LH 규정: A=25%, B=93%. 건설기준: A=35%, B=94%. 조달청 해석사례: A=53%, B=94%. 법령: A=90%, B=96%. 판례: A=72%, B=64%.">카테고리별 정답률 비교 데이터</canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- 카테고리별 인사이트 카드 -->
+  <div class="section">
+    <div class="section-title">분야별 분석</div>
+    <div class="insight-grid">
+
+      <div class="insight-card">
+        <div class="insight-header">
+          <div class="insight-icon" style="background:var(--blue-light);">📋</div>
+          <div>
+            <div class="insight-cat">LH 사내 규정</div>
+            <div class="insight-src">복지·여비·인사·보수 규정 등</div>
+          </div>
+        </div>
+        <div class="insight-stat">
+          <span class="stat-a">25%</span>
+          <span class="stat-arrow">→</span>
+          <span class="stat-b" style="color:var(--teal);">93%</span>
+          <span class="stat-delta delta-pos">+68pp</span>
+        </div>
+        <div class="insight-desc">LH 내부 문서는 인터넷에 공개되지 않아 웹 검색으로는 사실상 조회 불가. MCP 연결 시 가장 극적인 효과.</div>
+      </div>
+
+      <div class="insight-card">
+        <div class="insight-header">
+          <div class="insight-icon" style="background:var(--amber-light);">🏗️</div>
+          <div>
+            <div class="insight-cat">건설기준 (KDS·KCS·LHCS)</div>
+            <div class="insight-src">설계기준·표준시방서·LH 전문시방서</div>
+          </div>
+        </div>
+        <div class="insight-stat">
+          <span class="stat-a">35%</span>
+          <span class="stat-arrow">→</span>
+          <span class="stat-b" style="color:var(--teal);">94%</span>
+          <span class="stat-delta delta-pos">+59pp</span>
+        </div>
+        <div class="insight-desc">수치·조건이 많은 기술 기준은 웹 검색에서 오류가 잦음. MCP의 정확한 원문 조회가 큰 차이를 만듦.</div>
+      </div>
+
+      <div class="insight-card">
+        <div class="insight-header">
+          <div class="insight-icon" style="background:var(--purple-light);">📜</div>
+          <div>
+            <div class="insight-cat">조달청 해석사례</div>
+            <div class="insight-src">국가계약법규 유권해석 864건</div>
+          </div>
+        </div>
+        <div class="insight-stat">
+          <span class="stat-a">53%</span>
+          <span class="stat-arrow">→</span>
+          <span class="stat-b" style="color:var(--teal);">94%</span>
+          <span class="stat-delta delta-pos">+41pp</span>
+        </div>
+        <div class="insight-desc">일부 사례는 웹에서도 검색되나 MCP가 질의요지·회답·이유 전문을 직접 조회해 정확도 대폭 향상.</div>
+      </div>
+
+      <div class="insight-card">
+        <div class="insight-header">
+          <div class="insight-icon" style="background:var(--teal-light);">🏛️</div>
+          <div>
+            <div class="insight-cat">법령</div>
+            <div class="insight-src">법률·시행령·행정규칙 조문</div>
+          </div>
+        </div>
+        <div class="insight-stat">
+          <span class="stat-a">90%</span>
+          <span class="stat-arrow">→</span>
+          <span class="stat-b" style="color:var(--teal);">96%</span>
+          <span class="stat-delta delta-pos">+6pp</span>
+        </div>
+        <div class="insight-desc">법령은 공개 DB(국가법령정보센터)로 웹에서도 찾히지만, MCP가 더 정확하고 응답 속도는 3.6배 빠름.</div>
+      </div>
+
+      <div class="insight-card" style="grid-column: 1 / -1;">
+        <div class="insight-header">
+          <div class="insight-icon" style="background:var(--red-light);">⚖️</div>
+          <div>
+            <div class="insight-cat">판례</div>
+            <div class="insight-src">법원 판결 요지·판시사항</div>
+          </div>
+        </div>
+        <div class="insight-stat">
+          <span class="stat-a">72%</span>
+          <span class="stat-arrow">→</span>
+          <span class="stat-b" style="color:var(--red);">64%</span>
+          <span class="stat-delta delta-neg">-8pp</span>
+        </div>
+        <div class="insight-desc">유일하게 MCP가 역효과를 보인 분야. 판례 검색 API가 키워드 AND 매칭 방식이라 넓은 의미 검색에 한계가 있으며, 웹에서 접근 가능한 공개 판례와 차별화가 낮습니다. 검색 정밀도 개선이 필요합니다.</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 판정 분포 -->
+  <div class="section">
+    <div class="section-title">정답·부분정답·오답 분포</div>
+    <div class="verdict-row">
+      <div class="verdict-card">
+        <div class="verdict-cond">조건 A — 웹 검색만 (500문항)</div>
+        <div class="verdict-bar">
+          <div class="verdict-label"><span>정답</span><span style="color:var(--coral);">275건 (55.0%)</span></div>
+          <div class="bar-track"><div class="bar-fill" style="width:55%; background:var(--coral);"></div></div>
+        </div>
+        <div class="verdict-bar">
+          <div class="verdict-label"><span>부분정답</span><span style="color:var(--amber);">80건 (16.0%)</span></div>
+          <div class="bar-track"><div class="bar-fill" style="width:16%; background:var(--amber);"></div></div>
+        </div>
+        <div class="verdict-bar">
+          <div class="verdict-label"><span>오답</span><span style="color:var(--red);">145건 (29.0%)</span></div>
+          <div class="bar-track"><div class="bar-fill" style="width:29%; background:var(--red);"></div></div>
+        </div>
+      </div>
+      <div class="verdict-card">
+        <div class="verdict-cond">조건 B — MCP 연결 (500문항)</div>
+        <div class="verdict-bar">
+          <div class="verdict-label"><span>정답</span><span style="color:var(--teal);">441건 (88.2%)</span></div>
+          <div class="bar-track"><div class="bar-fill" style="width:88.2%; background:var(--teal);"></div></div>
+        </div>
+        <div class="verdict-bar">
+          <div class="verdict-label"><span>부분정답</span><span style="color:var(--amber);">42건 (8.4%)</span></div>
+          <div class="bar-track"><div class="bar-fill" style="width:8.4%; background:var(--amber);"></div></div>
+        </div>
+        <div class="verdict-bar">
+          <div class="verdict-label"><span>오답</span><span style="color:var(--red);">17건 (3.4%)</span></div>
+          <div class="bar-track"><div class="bar-fill" style="width:3.4%; background:var(--red);"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 응답 속도 -->
+  <div class="section">
+    <div class="section-title">답변 속도 비교 (문항당 평균)</div>
+    <div class="chart-card">
+      <div class="chart-title">분야별 평균 답변 소요 시간</div>
+      <div class="chart-sub">한 질문에 답하는 데 걸리는 시간 (초). 짧을수록 빠름.</div>
+      <div class="cond-legend">
+        <div class="cond-pill">
+          <div class="cond-dot" style="background:#D85A30;"></div>
+          <span>조건 A <span class="cond-desc">(웹 검색만)</span></span>
+        </div>
+        <div class="cond-pill">
+          <div class="cond-dot" style="background:#1D9E75;"></div>
+          <span>조건 B <span class="cond-desc">(MCP 연결)</span></span>
+        </div>
+      </div>
+      <div style="position:relative; height:260px;">
+        <canvas id="durChart" role="img" aria-label="분야별 평균 답변 소요 시간 비교. LH 규정: A=21.9초, B=10.0초. 건설기준: A=31.0초, B=7.6초. 조달청: A=13.1초, B=11.8초. 법령: A=12.0초, B=3.3초. 판례: A=15.3초, B=13.7초.">분야별 응답 시간 데이터</canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- 주요 결론 -->
+  <div class="section">
+    <div class="section-title">핵심 결론</div>
+    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px;">
+      <div style="background:var(--teal-light); border-radius:var(--radius); padding:20px; border:1px solid var(--teal-mid);">
+        <div style="font-size:24px; font-weight:600; color:#085041; margin-bottom:6px;">+33pp</div>
+        <div style="font-size:13px; color:#0F6E56; line-height:1.5;"><b>정답률 향상</b><br>55% → 88%로, MCP 연결 하나로 AI 답변 신뢰도가 크게 올라갑니다.</div>
+      </div>
+      <div style="background:var(--blue-light); border-radius:var(--radius); padding:20px; border:1px solid #B5D4F4;">
+        <div style="font-size:24px; font-weight:600; color:#0C447C; margin-bottom:6px;">2배 빠름</div>
+        <div style="font-size:13px; color:#185FA5; line-height:1.5;"><b>응답 속도</b><br>평균 18.7초 → 9.3초. 정확도와 속도를 동시에 개선합니다.</div>
+      </div>
+      <div style="background:var(--amber-light); border-radius:var(--radius); padding:20px; border:1px solid #FAC775;">
+        <div style="font-size:24px; font-weight:600; color:#633806; margin-bottom:6px;">판례 개선 필요</div>
+        <div style="font-size:13px; color:#854F0B; line-height:1.5;"><b>유일한 역효과</b><br>판례 검색 정밀도를 높이면 전체 성능이 추가로 향상될 여지가 있습니다.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 평가 방법 -->
+  <div class="section">
+    <div class="section-title">평가 방법</div>
+    <div class="method-box">
+      <p><b>질문 구성</b>: LH 실무와 관련된 5개 분야에서 각 100개씩, 총 500개의 실무 질문을 AI로 자동 생성했습니다. 각 질문에는 정답 근거(원문 인용)가 함께 기록됩니다.</p>
+      <p><b>답변 수집</b>: 동일한 500개 질문을 조건 A(웹 검색만)와 조건 B(MCP 연결) 두 환경에서 각각 AI에게 물어 총 1,000건의 답변을 수집했습니다.</p>
+      <p><b>채점</b>: 어느 조건의 답변인지 모르는 상태(블라인드)로 별도의 AI가 정답 원문과 대조해 정답·부분정답·오답 중 하나로 판정합니다.</p>
+    </div>
+  </div>
+
+  <div class="footer">
+    LH RAG MCP 서버 · 유용성 평가 보고서 · 2026년 6월
+  </div>
+
+</div>
+
+<script>
+const catLabels = ['LH 사내 규정','건설기준','조달청\n해석사례','법령','판례'];
+const catLabelsWrap = [['LH','사내 규정'],['건설기준'],['조달청','해석사례'],['법령'],['판례']];
+const accA = [25, 35, 53, 90, 72];
+const accB = [93, 94, 94, 96, 64];
+const durA = [21.9, 31.0, 13.1, 12.0, 15.3];
+const durB = [10.0, 7.6, 11.8, 3.3, 13.7];
+
+Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Pretendard', 'Noto Sans KR', sans-serif";
+Chart.defaults.font.size = 12;
+Chart.defaults.color = '#888780';
+
+new Chart(document.getElementById('catAccChart'), {
+  type: 'bar',
+  data: {
+    labels: catLabelsWrap,
+    datasets: [
+      {
+        label: '조건 A (웹 검색만)',
+        data: accA,
+        backgroundColor: 'rgba(216,90,48,0.85)',
+        borderColor: '#D85A30',
+        borderWidth: 0,
+        borderRadius: 5,
+      },
+      {
+        label: '조건 B (MCP 연결)',
+        data: accB,
+        backgroundColor: 'rgba(29,158,117,0.85)',
+        borderColor: '#1D9E75',
+        borderWidth: 0,
+        borderRadius: 5,
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y}%`
+        }
+      }
+    },
+    scales: {
+      y: {
+        min: 0, max: 100,
+        ticks: { callback: v => v + '%', stepSize: 25 },
+        grid: { color: 'rgba(0,0,0,0.05)' },
+        border: { display: false }
+      },
+      x: {
+        grid: { display: false },
+        border: { display: false },
+        ticks: { autoSkip: false }
+      }
+    }
+  }
+});
+
+new Chart(document.getElementById('durChart'), {
+  type: 'bar',
+  data: {
+    labels: catLabelsWrap,
+    datasets: [
+      {
+        label: '조건 A (웹 검색만)',
+        data: durA,
+        backgroundColor: 'rgba(216,90,48,0.85)',
+        borderWidth: 0,
+        borderRadius: 5,
+      },
+      {
+        label: '조건 B (MCP 연결)',
+        data: durB,
+        backgroundColor: 'rgba(29,158,117,0.85)',
+        borderWidth: 0,
+        borderRadius: 5,
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y}초`
+        }
+      }
+    },
+    scales: {
+      y: {
+        min: 0,
+        ticks: { callback: v => v + '초', stepSize: 10 },
+        grid: { color: 'rgba(0,0,0,0.05)' },
+        border: { display: false }
+      },
+      x: {
+        grid: { display: false },
+        border: { display: false },
+        ticks: { autoSkip: false }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
