@@ -20,7 +20,15 @@ AI_SEARCH_K = 5       # aiSearch 각 타입(법령조문/행정규칙조문)별 
 LAW_DETAIL_K = 5      # 법령 키워드검색 본문 조회 건수
 ADMRUL_DETAIL_K = 5   # 행정규칙 키워드검색 본문 조회 건수
 KW_VARIANTS_MAX = 3   # 키워드 검색 변형 상한 (초과 시 HTTP fan-out 증가)
-ADMRUL_ORG_MOLIT = "1613000"  # 국토교통부 소관부처코드
+# 부처명 → 법제처 행정규칙 검색 org 코드
+ADMRUL_ORG_CODES: dict[str, str] = {
+    "국토교통부":   "1613000",
+    "행정안전부":   "1741000",
+    "고용노동부":   "1492000",
+    "환경부":       "1480000",
+    "기후에너지환경부": "1480000",
+    "조달청":       "1230000",
+}
 
 _IMG_TAG_RE = re.compile(r"<img[^>]*>(?:</img>)?", re.IGNORECASE)
 _SUMMARY_LEN = 300
@@ -368,16 +376,17 @@ class LawApiSource(SearchSource):
         return results
 
     @retry(stop=stop_after_attempt(2), wait=wait_exponential(min=1, max=4))
-    async def _admrul_search(self, keywords: str) -> list[dict]:
-        """법제처 행정규칙 검색 API (키워드, 국토교통부 한정). 메타데이터 목록 반환."""
+    async def _admrul_search(self, keywords: str, org: str = "") -> list[dict]:
+        """법제처 행정규칙 검색 API. org 미지정 시 전부처 검색."""
         params = {
             "OC": law_oc_var.get() or settings.law_oc_default,
             "target": "admrul",
             "query": keywords,
-            "org": ADMRUL_ORG_MOLIT,
             "type": "JSON",
             "display": ADMRUL_DETAIL_K,
         }
+        if org:
+            params["org"] = org
         url = f"{LAW_API_BASE}/lawSearch.do?{urlencode(params)}"
         resp = await self._client.get(url)
         resp.raise_for_status()
@@ -539,14 +548,21 @@ class LawApiSource(SearchSource):
             parts.append(_format_full_article(art))
         return "\n\n".join(parts)
 
-    async def get_admrul_article(self, admrul_name: str, article: str) -> str:
+    async def get_admrul_article(self, admrul_name: str, article: str, ministry: str = "") -> str:
         """행정규칙에서 특정 조문 전문을 조회합니다."""
         try:
             art_no, art_of, _ = _parse_article_id(article)
         except ValueError as e:
             return str(e)
 
-        items = await self._admrul_search(admrul_name)
+        org = ADMRUL_ORG_CODES.get(ministry, "")
+        stripped = strip_non_law_keywords(admrul_name)
+        variants = list(dict.fromkeys([admrul_name, stripped]))
+        raw_lists = await asyncio.gather(
+            *(self._admrul_search(v, org=org) for v in variants),
+            return_exceptions=True,
+        )
+        items: list[dict] = _dedup(raw_lists, lambda it: it["id"], "행정규칙 조문조회 변형")
         if not items:
             return f"'{admrul_name}' 행정규칙을 찾지 못했습니다."
 
