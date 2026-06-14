@@ -1,0 +1,50 @@
+{"qid": "lh-01", "condition": "A", "verdict": "오답", "reason": "구체적인 퇴거 기간(1개월)을 확인하지 못하였다고 응답. 무응답."}
+{"qid": "lh-02", "condition": "A", "verdict": "오답", "reason": "직원 일비를 20,000원으로 답변하였으나 정답은 35,000원으로 핵심 수치 오류."}
+{"qid": "lh-03", "condition": "A", "verdict": "오답", "reason": "왕복 12km 미만이라고 답변하였으나 정답은 왕복 80km 미만으로 핵심 수치 오류."}
+{"qid": "lh-04", "condition": "A", "verdict": "오답", "reason": "구체적인 의결 요건을 확인하지 못하였다고 응답. 무응답."}
+{"qid": "lh-05", "condition": "A", "verdict": "오답", "reason": "정확한 의결 정족수를 확인하지 못하였다고 응답. 무응답."}
+{"qid": "kcsc-01", "condition": "A", "verdict": "오답", "reason": "확인 불가로 응답. 무응답."}
+{"qid": "kcsc-02", "condition": "A", "verdict": "오답", "reason": "확인 불가로 응답. 무응답."}
+{"qid": "kcsc-03", "condition": "A", "verdict": "부분정답", "reason": "핵심 수치(30m, 7일)는 정답과 일치하나 해당 기준이 KCS 61 20 20인지 여부를 단정하지 못하겠다고 유보."}
+{"qid": "kcsc-04", "condition": "A", "verdict": "오답", "reason": "확인 불가로 응답. 무응답."}
+{"qid": "kcsc-05", "condition": "A", "verdict": "정답", "reason": "정기시설검사 주기 2년에 1회 이상이 정답과 일치."}
+{"qid": "pps-01", "condition": "A", "verdict": "정답", "reason": "기성대가 공제 및 개산급 포함 원칙이 정답과 일치."}
+{"qid": "pps-02", "condition": "A", "verdict": "정답", "reason": "비작업일수 공사기간 포함 원칙이 정답과 일치."}
+{"qid": "pps-04", "condition": "A", "verdict": "정답", "reason": "예정가격 인상 불가 결론이 정답과 일치."}
+{"qid": "pps-05", "condition": "A", "verdict": "정답", "reason": "새로운 경쟁입찰 절차 개시 가능 내용이 정답과 일치."}
+{"qid": "pps-06", "condition": "A", "verdict": "정답", "reason": "국가계약법 적용 불가 및 건설산업기본법·하도급법 적용 결론이 정답과 일치."}
+{"qid": "law-01", "condition": "A", "verdict": "부분정답", "reason": "LH 시행 시 국토교통부장관 승인 핵심은 맞으나 대지면적 기준 승인권자 구분이 역전되어 세부 오류."}
+{"qid": "law-02", "condition": "A", "verdict": "정답", "reason": "최대 10년 범위 및 공용부분 기산일(사용검사일)이 정답과 일치."}
+{"qid": "law-03", "condition": "A", "verdict": "정답", "reason": "하자보수청구 주체와 시정명령 조치가 정답과 일치."}
+{"qid": "law-04", "condition": "A", "verdict": "정답", "reason": "계약보증금 10% 이상 납부 요건과 국고 귀속 처리가 정답과 일치."}
+{"qid": "law-05", "condition": "A", "verdict": "부분정답", "reason": "하도급 금지 원칙은 맞으나 예외 허용 언급으로 원칙 취지 희석."}
+{"qid": "prec-01", "condition": "A", "verdict": "정답", "reason": "재결절차 미거친 청구 불허 결론이 정답과 일치."}
+{"qid": "prec-02", "condition": "A", "verdict": "정답", "reason": "대항력이 소유권 취득 시 소멸 결론이 정답과 일치."}
+{"qid": "prec-03", "condition": "A", "verdict": "정답", "reason": "하자담보책임·채무불이행책임 경합 인정 판시가 정답과 일치."}
+{"qid": "prec-04", "condition": "A", "verdict": "정답", "reason": "압류 집행보전 후 직접지급청구권 미발생 결론이 정답과 일치."}
+{"qid": "prec-05", "condition": "A", "verdict": "정답", "reason": "쟁송기간 도과 후 재결 취소 불가 원칙이 정답과 일치."}
+{"qid": "lh-01", "condition": "B", "verdict": "정답", "reason": "퇴직·사망 시 1개월 이내 퇴거 요건 및 예외 조건이 정답과 일치."}
+{"qid": "lh-02", "condition": "B", "verdict": "정답", "reason": "직원 일비 35천원 핵심 수치가 정답과 일치."}
+{"qid": "lh-03", "condition": "B", "verdict": "정답", "reason": "왕복 80km 미만 기준이 정답과 일치."}
+{"qid": "lh-04", "condition": "B", "verdict": "정답", "reason": "평가등급 조정 시 출석위원 2/3 이상 찬성 요건이 정답과 일치."}
+{"qid": "lh-05", "condition": "B", "verdict": "정답", "reason": "재적위원 과반수 찬성 의결 요건이 정답과 일치."}
+{"qid": "kcsc-01", "condition": "B", "verdict": "정답", "reason": "전자연동장치 설치 원칙이 정답과 일치."}
+{"qid": "kcsc-02", "condition": "B", "verdict": "정답", "reason": "버팀대 1개당 20ton 압력 하중 기준이 정답과 일치."}
+{"qid": "kcsc-03", "condition": "B", "verdict": "오답", "reason": "질문은 KCS 61 20 20의 30m·7일을 묻고 있으나 LHCS 11 50 15 05의 6m·7일을 인용하여 거리 기준 오류."}
+{"qid": "kcsc-04", "condition": "B", "verdict": "정답", "reason": "10일 이내 복토 및 300mm 미만 장비 통행 금지 두 요건이 정답과 일치."}
+{"qid": "kcsc-05", "condition": "B", "verdict": "정답", "reason": "정기시설검사 2년에 1회 이상 주기가 정답과 일치."}
+{"qid": "pps-01", "condition": "B", "verdict": "정답", "reason": "기성대가 공제 및 개산급 포함 원칙이 정답과 일치."}
+{"qid": "pps-02", "condition": "B", "verdict": "정답", "reason": "비작업일수 공사기간 포함 원칙이 정답과 일치."}
+{"qid": "pps-04", "condition": "B", "verdict": "정답", "reason": "예정가격 인상 불가 결론이 정답과 일치."}
+{"qid": "pps-05", "condition": "B", "verdict": "정답", "reason": "새로운 경쟁입찰 절차 개시 가능 내용이 정답과 일치."}
+{"qid": "pps-06", "condition": "B", "verdict": "정답", "reason": "국가계약법 적용 불가 및 관련 법령 적용 결론이 정답과 일치."}
+{"qid": "law-01", "condition": "B", "verdict": "정답", "reason": "LH 시행 시 국토교통부장관 승인 및 대지면적 기준 구분이 정답과 일치."}
+{"qid": "law-02", "condition": "B", "verdict": "정답", "reason": "최대 10년 및 사용검사일 기산이 정답과 일치."}
+{"qid": "law-03", "condition": "B", "verdict": "정답", "reason": "하자보수청구 주체와 시정명령 권한이 정답과 일치."}
+{"qid": "law-04", "condition": "B", "verdict": "정답", "reason": "계약보증금 10% 이상 및 국고 귀속 처리가 정답과 일치."}
+{"qid": "law-05", "condition": "B", "verdict": "정답", "reason": "하도급 금지 원칙과 재하도급 금지 원칙이 정답과 일치."}
+{"qid": "prec-01", "condition": "B", "verdict": "정답", "reason": "재결절차 미거친 청구 불허 결론이 정답과 일치."}
+{"qid": "prec-02", "condition": "B", "verdict": "정답", "reason": "대항력이 소유권 취득 시 소멸 결론이 정답과 일치."}
+{"qid": "prec-03", "condition": "B", "verdict": "정답", "reason": "하자담보책임·채무불이행책임 경합 인정이 정답과 일치."}
+{"qid": "prec-04", "condition": "B", "verdict": "정답", "reason": "압류 집행보전 후 직접지급청구권 미발생 결론이 정답과 일치."}
+{"qid": "prec-05", "condition": "B", "verdict": "정답", "reason": "쟁송기간 도과 후 재결 취소 불가 원칙이 정답과 일치."}

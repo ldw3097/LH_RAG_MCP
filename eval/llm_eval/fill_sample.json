@@ -1,0 +1,66 @@
+{
+  "lh": [
+    "/Users/ldw/code/LH_RAG_MCP/code/data/lh_regulation/markdown/220902_임원추천위원회운영규정규정제270호.md",
+    "/Users/ldw/code/LH_RAG_MCP/code/data/lh_regulation/markdown/260309_인사규정시행세칙.md",
+    "/Users/ldw/code/LH_RAG_MCP/code/data/lh_regulation/markdown/180419_연구원관리시행세칙.md",
+    "/Users/ldw/code/LH_RAG_MCP/code/data/lh_regulation/markdown/250813_문서규정.md",
+    "/Users/ldw/code/LH_RAG_MCP/code/data/lh_regulation/markdown/141105_용지규정.md",
+    "/Users/ldw/code/LH_RAG_MCP/code/data/lh_regulation/markdown/260112_경영투자심사위원회운영시행세칙.md",
+    "/Users/ldw/code/LH_RAG_MCP/code/data/lh_regulation/markdown/260112_개발사업규정시행세칙.md",
+    "/Users/ldw/code/LH_RAG_MCP/code/data/lh_regulation/markdown/250929_인사규정.md",
+    "/Users/ldw/code/LH_RAG_MCP/code/data/lh_regulation/markdown/260112_임금피크제운영시행세칙.md",
+    "/Users/ldw/code/LH_RAG_MCP/code/data/lh_regulation/markdown/130705_사옥관리규정.md",
+    "/Users/ldw/code/LH_RAG_MCP/code/data/lh_regulation/markdown/250813_개발사업규정.md",
+    "/Users/ldw/code/LH_RAG_MCP/code/data/lh_regulation/markdown/250813_경영심의회운영규정.md",
+    "/Users/ldw/code/LH_RAG_MCP/code/data/lh_regulation/markdown/181105_임원추천위원회운영규정.md",
+    "/Users/ldw/code/LH_RAG_MCP/code/data/lh_regulation/markdown/210130_용지규정시행세칙.md",
+    "/Users/ldw/code/LH_RAG_MCP/code/data/lh_regulation/markdown/131101_주거환경개선구역내양여된토지의관리및처분에관한시행규정.md"
+  ],
+  "kcsc": [
+    "/Users/ldw/code/LH_RAG_MCP/code/data/kcsc/cache/20201223_LHCS11501505.json",
+    "/Users/ldw/code/LH_RAG_MCP/code/data/kcsc/cache/20201223_LHCS613020.json",
+    "/Users/ldw/code/LH_RAG_MCP/code/data/kcsc/cache/20241212_KDS347045.json",
+    "/Users/ldw/code/LH_RAG_MCP/code/data/kcsc/cache/20230912_KDS241222.json",
+    "/Users/ldw/code/LH_RAG_MCP/code/data/kcsc/cache/20230113_KDS446010.json",
+    "/Users/ldw/code/LH_RAG_MCP/code/data/kcsc/cache/20201223_LHCS142044.json",
+    "/Users/ldw/code/LH_RAG_MCP/code/data/kcsc/cache/20260224_KCS318005.json",
+    "/Users/ldw/code/LH_RAG_MCP/code/data/kcsc/cache/20260224_KCS316010.json",
+    "/Users/ldw/code/LH_RAG_MCP/code/data/kcsc/cache/20201223_LHCS415508.json",
+    "/Users/ldw/code/LH_RAG_MCP/code/data/kcsc/cache/20260224_KCS336010.json",
+    "/Users/ldw/code/LH_RAG_MCP/code/data/kcsc/cache/20201223_LHCS44500515.json",
+    "/Users/ldw/code/LH_RAG_MCP/code/data/kcsc/cache/20240828_KDS323530.json",
+    "/Users/ldw/code/LH_RAG_MCP/code/data/kcsc/cache/20201223_LHCS14201210.json",
+    "/Users/ldw/code/LH_RAG_MCP/code/data/kcsc/cache/20190529_KDS475010.json"
+  ],
+  "pps": [
+    "/Users/ldw/code/LH_RAG_MCP/code/data/pps/cache/20251204_444754.json",
+    "/Users/ldw/code/LH_RAG_MCP/code/data/pps/cache/20251204_451646.json",
+    "/Users/ldw/code/LH_RAG_MCP/code/data/pps/cache/20251204_435256.json",
+    "/Users/ldw/code/LH_RAG_MCP/code/data/pps/cache/20251204_448326.json",
+    "/Users/ldw/code/LH_RAG_MCP/code/data/pps/cache/20251204_440592.json",
+    "/Users/ldw/code/LH_RAG_MCP/code/data/pps/cache/20251204_431546.json",
+    "/Users/ldw/code/LH_RAG_MCP/code/data/pps/cache/20251204_453308.json",
+    "/Users/ldw/code/LH_RAG_MCP/code/data/pps/cache/20251204_446986.json",
+    "/Users/ldw/code/LH_RAG_MCP/code/data/pps/cache/20251204_452148.json",
+    "/Users/ldw/code/LH_RAG_MCP/code/data/pps/cache/20251204_431812.json",
+    "/Users/ldw/code/LH_RAG_MCP/code/data/pps/cache/20251204_444978.json",
+    "/Users/ldw/code/LH_RAG_MCP/code/data/pps/cache/20251204_439562.json",
+    "/Users/ldw/code/LH_RAG_MCP/code/data/pps/cache/20251204_442606.json",
+    "/Users/ldw/code/LH_RAG_MCP/code/data/pps/cache/20251204_430296.json",
+    "/Users/ldw/code/LH_RAG_MCP/code/data/pps/cache/20251204_438056.json",
+    "/Users/ldw/code/LH_RAG_MCP/code/data/pps/cache/20251204_448076.json",
+    "/Users/ldw/code/LH_RAG_MCP/code/data/pps/cache/20250918_451064.json"
+  ],
+  "law_seeds": [
+    {
+      "law": "공공주택 특별법",
+      "topic": "임대차계약 해제·해지",
+      "articles": "제49조의3"
+    },
+    {
+      "law": "도시개발법",
+      "topic": "수용·사용 방식",
+      "articles": "제22조~제24조"
+    }
+  ]
+}
