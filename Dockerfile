@@ -29,13 +29,15 @@ COPY crawler/kcsc_indexer.py crawler/kcsc_indexer.py
 COPY crawler/lh_crawler.py crawler/lh_crawler.py
 COPY crawler/pps_api.py crawler/pps_api.py
 COPY crawler/pps_indexer.py crawler/pps_indexer.py
+COPY crawler/csi_indexer.py crawler/csi_indexer.py
 
-RUN mkdir -p /data/lh_regulation /data/kcsc /data/pps
+RUN mkdir -p /data/lh_regulation /data/kcsc /data/pps /data/csi
 
 ENV MARKDOWN_PATH=/data/lh_regulation/markdown
 ENV BM25_PATH=/data/lh_regulation
 ENV KCSC_DATA_PATH=/data/kcsc
 ENV PPS_DATA_PATH=/data/pps
+ENV CSI_DATA_PATH=/data/csi
 ENV HOST=0.0.0.0
 ENV PORT=8000
 

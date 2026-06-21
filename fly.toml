@@ -9,6 +9,7 @@ primary_region = 'nrt'  # Tokyo — 한국에서 가장 가까운 fly.io 리전
   MARKDOWN_PATH   = '/data/lh_regulation/markdown'
   KCSC_DATA_PATH  = '/data/kcsc'
   PPS_DATA_PATH   = '/data/pps'
+  CSI_DATA_PATH   = '/data/csi'
   PORT            = '8000'
   HOST            = '0.0.0.0'
 
