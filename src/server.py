@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import time
 from datetime import datetime, timedelta, timezone
@@ -14,6 +15,7 @@ from src.sources.lh_vector import LHVectorSource
 from src.sources.kcsc_vector import KCSCVectorSource
 from src.sources.prec_api import PrecedentSource
 from src.sources.pps_vector import PpsVectorSource
+from src.sources.csi_stats import CsiStatsSource
 
 SOURCE_LABELS = {
     "law_api": "국가법령정보센터",
@@ -21,6 +23,7 @@ SOURCE_LABELS = {
     "kcsc_vector_db": "건설기준(KDS/KCS/LHCS)",
     "prec": "법원 판례",
     "pps_vector_db": "조달청 해석사례",
+    "csi_stats": "건설안전 사고통계",
 }
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -38,6 +41,8 @@ mcp = FastMCP(
         "search_construction_standards 도구로 검색하세요. "
         "조달청 계약법규 해석사례(국가계약법규 유권해석)는 "
         "search_procurement_interpretations 도구로 검색하세요. "
+        "예정 공사의 공종·작업단계·시설물로 과거 건설안전 사고유형 통계를 진단하려면 "
+        "assess_construction_risk 도구를 사용하세요. "
         "검색 도구는 자연어 질의(query)와 핵심 키워드(keywords)를 함께 전달하세요. "
         "질문이 여러 영역에 걸쳐 있으면 해당 도구들을 모두 호출하세요. "
         "search_law로 목차를 확인한 뒤 특정 조문 전문이 필요하면 "
@@ -52,6 +57,7 @@ _sources = {
     "kcsc_vector_db": KCSCVectorSource(),
     "prec": PrecedentSource(),
     "pps_vector_db": PpsVectorSource(),
+    "csi_stats": CsiStatsSource(),
 }
 
 
@@ -273,6 +279,119 @@ async def search_procurement_interpretations(query: str, keywords: str) -> str:
     return await _search_single("pps_vector_db", query, keywords)
 
 
+_CSI_LEVEL_LABELS = {
+    "L1": "공종소분류+작업프로세스+시설물소분류",
+    "L2": "공종소분류+작업프로세스",
+    "L3": "작업프로세스",
+    "baseline": "전체(작업프로세스 입력 자료)",
+}
+
+_CSI_DELTA_MARK = 3.0   # 기준선 대비 ±이 %p 이상이면 ↑/↓ 강조
+
+
+def _csi_tool_description() -> str:
+    """csi_vocab.json의 별칭 목록을 읽어 도구 설명을 동적 구성한다 (없으면 일반 설명)."""
+    base = (
+        "예정 공사의 잠재 사고유형을 과거 건설안전 사고통계로 진단합니다. "
+        "국토안전관리원 건설안전 사고사례(2019~2025, 약 3.7만건)에서 입력한 공사 조건과 "
+        "같은 과거 사고들을 모아 인적사고종류(넘어짐·떨어짐·물체에 맞음·끼임 등)의 "
+        "분포와, 기준선 대비 각 사고유형이 얼마나 더 발생하는지 통계를 제공합니다. \n"
+        "표본이 부족하면 변수를 단계적으로 떨어뜨려(공종+작업+시설물 → 공종+작업 → 작업) "
+        "집계하며, 어느 수준으로 집계했는지 표기합니다.\n\n"
+        "각 인자에는 아래 목록의 값 중 하나를 넣으세요. "
+    )
+    try:
+        import json
+        from pathlib import Path
+        vpath = Path(settings.csi_data_path) / "csi_vocab.json"
+        vocab = json.loads(vpath.read_text(encoding="utf-8"))
+        field_titles = {
+            "work_process": "work_process(작업프로세스, 필수)",
+            "work_subtype": "work_subtype(공종 소분류, 선택)",
+            "facility_subtype": "facility_subtype(시설물 소분류, 선택)",
+        }
+        for field, title in field_titles.items():
+            values = sorted(vocab.get(field, {}).values())
+            if values:
+                base += f"\n[{title}] {', '.join(values)}\n"
+    except Exception as e:
+        logger.warning("csi 어휘 로드 실패 — 도구 설명에 별칭 목록 미포함: %s", e)
+    return base
+
+
+def _format_csi(result: dict) -> str:
+    """assess() 결과 dict를 한국어 텍스트 블록으로 포맷."""
+    if not result.get("loaded"):
+        return ("건설안전 사고통계 데이터가 없습니다. "
+                "scripts/build_csi_index.py를 실행하세요.")
+
+    err = result.get("error")
+    if err:
+        return (
+            f"입력한 {err['field']} 값 '{err['value']}'을(를) 인식하지 못했습니다.\n"
+            f"다음 값 중 하나로 다시 호출하세요:\n"
+            f"{', '.join(err['valid_aliases'])}"
+        )
+
+    inp = result["input"]
+    inp_str = " / ".join(
+        f"{k}={v}" for k, v in (
+            ("공종", inp.get("공종소분류")),
+            ("작업프로세스", inp.get("작업프로세스")),
+            ("시설물", inp.get("시설물소분류")),
+        ) if v
+    ) or "(입력 없음)"
+
+    lines = ["[건설안전 사고유형 진단]", f"입력: {inp_str}"]
+    level_label = _CSI_LEVEL_LABELS.get(result["level"], result["level"])
+    sample_note = " · 표본 부족(참고용)" if result.get("low_sample") else ""
+    if result["level"] == "baseline":
+        lines.append(f"집계수준: 전체 사고 평균 (작업프로세스 미입력 — 조합 통계 불가){sample_note}")
+    else:
+        lines.append(f"집계수준: {result['level']} ({level_label}) · 표본 n={result['n']}{sample_note}")
+    lines.append(f"전체 사고 평균: 작업프로세스가 기재된 사고 {result['baseline_total']:,}건 기준")
+    lines.append("")
+
+    if not result["distribution"]:
+        lines.append("해당 조건의 사고 기록을 찾지 못했습니다.")
+        return "\n".join(lines)
+
+    lines.append("사고유형(인적사고종류 대분류) 분포 — 전체 사고 평균 대비 증감(%p):")
+    for d in result["distribution"]:
+        base = d["baseline_pct"]
+        delta = d["pct"] - base
+        arrow = " ↑" if delta >= _CSI_DELTA_MARK else (" ↓" if delta <= -_CSI_DELTA_MARK else "")
+        comp = f"전체 평균 {base:.1f}% → {delta:+.1f}%p{arrow}"
+        lines.append(
+            f"  {d['type']}  {d['pct']:.1f}% ({d['count']}건)   {comp}"
+        )
+    lines.append("")
+    lines.append("출처: 국토안전관리원 건설안전사고사례(2019~2025)")
+    return "\n".join(lines)
+
+
+@mcp.tool(description=_csi_tool_description())
+async def assess_construction_risk(
+    work_process: str,
+    work_subtype: str = "",
+    facility_subtype: str = "",
+) -> str:
+    logger.info(
+        "진단 요청 [csi]: 공종=%s | 작업=%s | 시설=%s",
+        work_subtype, work_process, facility_subtype,
+    )
+    try:
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(
+            None,
+            lambda: _sources["csi_stats"].assess(work_subtype, work_process, facility_subtype),
+        )
+    except Exception as e:
+        logger.error("csi 진단 오류: %s", e)
+        return "진단 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
+    return _truncate_response(_format_csi(result))
+
+
 @mcp.tool()
 async def get_law_article(law_name: str, article: str) -> str:
     """
@@ -439,6 +558,7 @@ def main():
     _sources["lh_vector_db"]._ensure_loaded()
     _sources["kcsc_vector_db"]._ensure_loaded()
     _sources["pps_vector_db"]._ensure_loaded()
+    _sources["csi_stats"]._ensure_loaded()
     logger.info("BM25 인덱스 사전 로딩 완료")
 
     app = mcp.http_app(transport="streamable-http")

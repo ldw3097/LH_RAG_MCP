@@ -34,6 +34,10 @@ class Settings(BaseSettings):
     pps_data_path: str = "./data/pps"
     pps_bm25_collection: str = "pps_interpretations"
 
+    # 국토안전관리원 건설안전 사고통계 (CSV → 정제 레코드 pkl, 통계 집계용)
+    csi_data_path: str = "./data/csi"
+    csi_pkl_name: str = "csi_accidents.pkl"
+
     # MCP 서버 인증
     mcp_api_key: str = ""
     host: str = "0.0.0.0"

@@ -4,6 +4,7 @@
 /data/chroma/
 /data/kcsc/
 /data/pps/
+/data/csi/
 /data/lh_regulation/
 
 # 벡터DB 및 크롤링 데이터 (data/.gitkeep만 추적)
