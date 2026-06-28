@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     deepinfra_api_key: str = ""
     embedding_model: str = "Qwen/Qwen3-Embedding-0.6B"
     embedding_batch_model: str = "Qwen/Qwen3-Embedding-0.6B-batch"
+    reranker_model: str = "Qwen/Qwen3-Reranker-4B"   # DeepInfra 리랭커 (deepinfra_api_key 재사용)
 
     # KCSC 건설기준 (국가건설기준센터 Open API)
     kcsc_api_key: str = ""

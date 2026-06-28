@@ -33,20 +33,14 @@ mcp = FastMCP(
     name="LH RAG MCP",
     instructions=(
         "LH 임직원 업무 지원 서버입니다. "
-        "대한민국 법령·행정규칙은 search_law 도구로, "
-        "LH 사내 규정(인사·보수·직제·감사·보안·문서·업무 등 임직원 적용 규정·규칙·시행세칙)은 "
-        "search_lh_regulations 도구로 검색하세요. "
-        "법원 판례는 search_precedents 도구로 키워드 검색하세요. "
-        "건설기준(KDS 설계기준·KCS 표준시방서·LHCS LH 전문시방서)은 "
-        "search_construction_standards 도구로 검색하세요. "
-        "조달청 계약법규 해석사례(국가계약법규 유권해석)는 "
-        "search_procurement_interpretations 도구로 검색하세요. "
-        "예정 공사의 공종·작업단계·시설물로 과거 건설안전 사고유형 통계를 진단하려면 "
-        "assess_construction_risk 도구를 사용하세요. "
-        "검색 도구는 자연어 질의(query)와 핵심 키워드(keywords)를 함께 전달하세요. "
-        "질문이 여러 영역에 걸쳐 있으면 해당 도구들을 모두 호출하세요. "
-        "search_law로 목차를 확인한 뒤 특정 조문 전문이 필요하면 "
+        "법령·행정규칙(search_law), LH 사내 규정(search_lh_regulations), "
+        "건설기준(search_construction_standards), 판례(search_precedents), "
+        "조달청 유권해석(search_procurement_interpretations), "
+        "건설안전 사고통계 진단(assess_construction_risk) 도구를 제공합니다. "
+        "search_law로 목차를 확인한 뒤 특정 조문 전문이 필요한 경우 "
         "get_law_article(법령) 또는 get_admrul_article(행정규칙)로 후속 조회하세요. "
+        "생략 가능하다고 명시되지 않은 인자는 필수값입니다. "
+        "keywords 인자는 핵심 키워드를 공백으로 구분해 전달하세요. "
         "답변 생성시 반드시 출처를 명시하세요."
     ),
 )
@@ -109,22 +103,11 @@ async def _search_single(source_id: str, query: str, keywords: str) -> str:
 @mcp.tool()
 async def search_law(query: str, keywords: str) -> str:
     """
-    국가법령정보센터에서 법령(법률·시행령·시행규칙) 조문과 행정규칙(고시·훈령·예규)을 검색합니다.
-
-    대한민국 법령과 국토교통부 행정규칙에 관한 질문에 사용하세요. LH 내규가 아닌
-    국가 차원의 법령·규칙이 필요할 때 적합합니다.
-
-    반환 형식 — 세 블록으로 구성됩니다:
-    1. ■ AI 의미검색 (조문): query 기반 AI 검색으로 찾은 법령·행정규칙 조문
-       각 항목: 법령명 제N조(조문제목) / 법제처 URL / 조문 전문.
-    2. ■ 키워드 검색 (법령): keywords 기반 정확도 순 법령 목록
-       각 항목: 법령명 / 법제처 URL / 목차 + 제1조 목적부분 (최대 700자).
-    3. ■ 키워드 검색 (행정규칙): keywords 기반 국토교통부 행정규칙 목록 
-       각 항목: 행정규칙명 (고시·훈령·예규 등) / 법제처 URL / 목차 + 제1조 본문 (최대 700자).
+    국가법령정보센터에서 대한민국 법령(법률·시행령·시행규칙) 조문과 행정규칙(고시·훈령·예규)을 검색합니다.
 
     Args:
-        query: 자연어로 요약한 질의 (예: "전세 보증금을 못 돌려받을 때 임차인 보호").
-        keywords: 핵심 키워드를 공백으로 구분 (예: "주택임대차보호법 보증금 우선변제").
+        query: 자연어로 요약한 질의.
+        keywords: 핵심 키워드 (예: "주택임대차보호법 보증금 우선변제").
     """
     logger.info("검색 요청 [law_api]: query=%s | keywords=%s", query, keywords)
     try:
@@ -170,16 +153,12 @@ async def search_lh_regulations(query: str, keywords: str) -> str:
     """
     LH(한국토지주택공사) 사내 규정을 검색합니다.
 
-    인사·보수·채용·교육·직제(조직)·감사·보안·문서/기록물/정보화/데이터 관리·물품·
-    소송·경영·개발사업 등 LH 임직원에게 적용되는 내부 규정·규칙·시행세칙·취업규칙을
-    검색합니다. 사내 업무 절차·복무·조직 운영에 관한 질문에 사용하세요.
-    (국가 법령이 아닌 LH 자체 내규이며, 임대주택 신청 등 대외 정책 안내가 아닙니다.)
-
-    반환 형식: 규정명(조문 범위) / 원문 URL / 조문 본문
+    인사·보수·직제·감사·보안 등 LH 임직원과 관련된 내부 규정·시행세칙을 검색합니다. 
+    국가 법령이나 대외 정책이 아닌 LH 내부 업무 절차·복무·조직 운영에 관한 질문에 사용하세요.
 
     Args:
         query: 자연어로 요약한 질의.
-        keywords: 핵심 키워드를 공백으로 구분.
+        keywords: 핵심 키워드 (예: "연차 휴가 복무").
     """
     return await _search_single("lh_vector_db", query, keywords)
 
@@ -196,20 +175,15 @@ async def search_construction_standards(query: str, keywords: str, category: str
     """
     건설기준(KDS·KCS·LHCS)을 검색합니다.
 
-    KDS(설계기준)·KCS(표준시방서)·LHCS(LH 전문시방서) 등 건설 설계·시공 기준을
-    검색합니다. 구조·지반·토목·건축·시공 방법, 재료·품질 기준, 설계 하중·안전율 등
-    기술적 건설기준에 관한 질문에 사용하세요. (국가 법령이나 LH 사내 행정규정이 아닌
-    건설 기술기준입니다.)
-
-    반환 형식: 기준코드명(KDS/KCS/LHCS) 조항번호 / KCSC URL / 조문 본문.
+    구조·지반·토목·건축·시공 방법, 재료·품질 기준, 설계 하중·안전율 등 기술적 건설기준에 관한 질문에 사용하세요. 
 
     Args:
-        query: 자연어로 요약한 질의 (예: "옹벽 설계 시 토압 산정 방법").
-        keywords: 핵심 키워드를 공백으로 구분 (예: "옹벽 토압 안정성 설계").
+        query: 자연어로 요약한 질의.
+        keywords: 핵심 키워드 (예: "옹벽 토압 안정성 설계").
         category: 검색 범위.
-            "design"       — KDS(설계기준)만. 구조 계산·하중·안전율·설계 공식 등 설계 단계 질문.
-            "construction" — KCS(표준시방서)·LHCS(LH 전문시방서)만. 공법·재료·품질관리·시공 절차 질문.
-            "all"          — 전체 검색 (기본값). 설계·시공 경계가 불분명하거나 둘 다 필요한 경우.
+            "design"       — KDS(설계기준)만. 설계 계산·하중·안전율 등 설계 단계 질문.
+            "construction" — KCS(표준시방서)·LHCS(LH 전문시방서)만. 공법·재료·시공 절차 질문.
+            "all"          — 전체 검색 (기본값).
     """
     code_types = _CATEGORY_MAP.get(category)
     logger.info("검색 요청 [kcsc_vector_db]: query=%s | keywords=%s | category=%s", query, keywords, category)
@@ -229,32 +203,29 @@ async def search_construction_standards(query: str, keywords: str, category: str
 
 
 @mcp.tool()
-async def search_precedents(keywords: str) -> str:
+async def search_precedents(query: str, law_name: str = "", keywords: str = "") -> str:
     """
-    법원 판례를 키워드로 검색합니다.
-
-    키워드는 공백 구분 AND 매칭입니다. 가장 중요한 핵심 키워드를 맨 앞에 두고
-    최대 2개만 사용하세요. 결과가 없으면 자동으로 첫 번째 키워드만으로 재검색합니다.
-    search_law 결과의 법령명·조문번호를 포함하면 해당 법령을 인용한 판례를 찾을 수 있습니다.
-
-    반환 형식: 각 항목은 사건명(법원·선고일) / 법제처 URL / 판시사항·판결요지·참조조문·참조판례
+    법원 판례를 검색합니다.
 
     Args:
-        keywords: 핵심 키워드 최대 2개를 공백으로 구분. 가장 중요한 키워드를 맨 앞에.
-            첫 번째 키워드는 검색 실패 시 단독 재검색에 쓰이므로 구체적으로 선택.
-            (예: "토지수용 보상", "임대차 해지", "주택임대차보호법 제3조")
+        query: 자연어 문장으로 요약한 질의.
+        law_name: 관련 법령 정식명칭. 생략 가능.
+        keywords: 쟁점과 직결된 핵심 용어 (예: "직접지급합의 묵시적합의해지").
     """
-    logger.info("검색 요청 [prec]: keywords=%s", keywords)
+    if not law_name and not keywords:
+        return "law_name 또는 keywords 중 하나 이상을 전달해야 합니다."
+    logger.info("검색 요청 [prec]: query=%s | law_name=%s | keywords=%s", query, law_name, keywords)
     try:
-        results = await _sources["prec"].search("", keywords)
+        results = await _sources["prec"].search(query, law_name=law_name, keywords=keywords)
     except Exception as e:
         logger.error("소스 prec 검색 오류: %s", e)
         return "검색 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
     if not results:
-        return "관련 판례를 찾지 못했습니다. 다른 키워드로 다시 질문해 주세요."
+        hint = law_name or keywords
+        return f"'{hint}' 관련 판례를 찾지 못했습니다. 다른 키워드로 시도해주세요."
     label = SOURCE_LABELS["prec"]
     logger.info("검색 완료 [prec]: %d개 결과", len(results))
-    lines = [f"키워드: {keywords}", f"검색 소스: {label}", ""]
+    lines = [f"검색어: {query}", f"법령: {law_name}", f"키워드: {keywords}", f"검색 소스: {label}", ""]
     for i, r in enumerate(results, 1):
         lines.append(f"[{i}] [{label}] {r.to_text()}")
     return _truncate_response("\n".join(lines))
@@ -265,16 +236,12 @@ async def search_procurement_interpretations(query: str, keywords: str) -> str:
     """
     조달청 계약법규 해석사례(유권해석)를 검색합니다.
 
-    국가계약법·지방계약법·계약예규 등 국가계약법규에 대한 조달청의 유권해석 사례를
-    질의요지·회답 본문까지 의미검색해 반환합니다. 입찰·낙찰자 선정, 계약 체결·관리,
-    물가변동/설계변경에 따른 계약금액 조정, 지체상금, 하자담보 등 조달 업무 관련 질문에 사용하세요.
-    2022년 이후 864건 수록. 2021년 이전 사례는 API 미제공으로 포함되지 않습니다.
-
-    반환 형식: 안건명(해석일자) / [안건명] [질의요지] [회답] [이유] [관련법령] 구조의 전문.
+    입찰·낙찰자 선정, 계약 체결·관리, 하자담보 등 국가계약법규에 관한 조달청 유권해석이 필요할 때 사용하세요.
+    2022년 이후 사례만 수록됩니다.
 
     Args:
-        query: 자연어로 요약한 질의 (예: "물가가 올라 계약금액을 조정받을 수 있는지").
-        keywords: 핵심 키워드를 공백으로 구분 (예: "물가변동 계약금액 조정").
+        query: 자연어로 요약한 질의.
+        keywords: 핵심 키워드 (예: "물가변동 계약금액 조정").
     """
     return await _search_single("pps_vector_db", query, keywords)
 
@@ -397,13 +364,11 @@ async def get_law_article(law_name: str, article: str) -> str:
     """
     법령의 특정 조문 전문을 조회합니다.
 
-    search_law 결과에서 확인한 법령명과 조문 번호를 입력하면 해당 조문의 전문을 반환합니다.
-    search_law로 목차를 먼저 확인한 뒤 원하는 조문을 이 툴로 상세 조회하는 2-step 플로우에 사용하세요.
+    search_law로 목차를 확인한 뒤 원하는 조문을 상세 조회하는 2-step 플로우에 사용하세요.
 
     Args:
-        law_name: 법령명 (예: "주택임대차보호법", "공동주택관리법 시행령")
-        article:  조문 식별자 (예: "제3조", "제7조의2")
-                  
+        law_name: 법령명
+        article:  조문 식별자 ("제3조", "제7조의2" 형식)
     """
     logger.info("조문 조회 [law]: law_name=%s | article=%s", law_name, article)
     try:
@@ -419,15 +384,12 @@ async def get_admrul_article(admrul_name: str, article: str, ministry: str = "")
     """
     행정규칙(고시·훈령·예규)의 특정 조문 전문을 조회합니다.
 
-    search_law 결과에서 확인한 행정규칙명과 조문 번호를 입력하면 해당 조문의 전문을 반환합니다.
-    search_law로 목차를 먼저 확인한 뒤 원하는 조문을 이 툴로 상세 조회하는 2-step 플로우에 사용하세요.
-    소관부처를 알고 있으면 ministry에 지정하면 검색 정확도가 높아집니다.
+    search_law로 목차를 확인한 뒤 원하는 조문을 상세 조회하는 2-step 플로우에 사용하세요.
 
     Args:
-        admrul_name: 행정규칙명 (예: "공동주택 관리비 등의 세부 처리기준")
-        article:     조문 식별자 (예: "제5조", "제7조의2")
-        ministry:    소관부처명 (예: "국토교통부", "행정안전부", "고용노동부", "환경부", "조달청").
-                     생략하면 전 부처 검색. search_law 결과의 소관부처를 그대로 전달하세요.
+        admrul_name: 행정규칙명
+        article:     조문 식별자 ("제5조", "제7조의2" 형식)
+        ministry:    소관부처명. 생략하면 전 부처 검색.
     """
     logger.info("조문 조회 [admrul]: admrul_name=%s | article=%s | ministry=%s", admrul_name, article, ministry)
     try:

@@ -1,0 +1,23 @@
+{
+  "lh": [
+    "/Users/ldw/code/LH_RAG_MCP/code/data/lh_regulation/markdown/150306_복지후생규정시행세칙.md",
+    "/Users/ldw/code/LH_RAG_MCP/code/data/lh_regulation/markdown/111031_해외근무직원의복무등에관한규정.md",
+    "/Users/ldw/code/LH_RAG_MCP/code/data/lh_regulation/markdown/250813_여비규정.md",
+    "/Users/ldw/code/LH_RAG_MCP/code/data/lh_regulation/markdown/250813_경영계획및관리에관한규정.md",
+    "/Users/ldw/code/LH_RAG_MCP/code/data/lh_regulation/markdown/220902_임원추천위원회운영규정규정제270호.md"
+  ],
+  "kcsc": [
+    "/Users/ldw/code/LH_RAG_MCP/code/data/kcsc/cache/20190524_KDS474030.json",
+    "/Users/ldw/code/LH_RAG_MCP/code/data/kcsc/cache/20180903_KCS612020.json",
+    "/Users/ldw/code/LH_RAG_MCP/code/data/kcsc/cache/20201223_LHCS142041.json",
+    "/Users/ldw/code/LH_RAG_MCP/code/data/kcsc/cache/20251230_KCS113015.json",
+    "/Users/ldw/code/LH_RAG_MCP/code/data/kcsc/cache/20241212_KDS349915.json"
+  ],
+  "pps": [
+    "/Users/ldw/code/LH_RAG_MCP/code/data/pps/cache/20251204_429860.json",
+    "/Users/ldw/code/LH_RAG_MCP/code/data/pps/cache/20251204_429764.json",
+    "/Users/ldw/code/LH_RAG_MCP/code/data/pps/cache/20251204_431604.json",
+    "/Users/ldw/code/LH_RAG_MCP/code/data/pps/cache/20251204_435582.json",
+    "/Users/ldw/code/LH_RAG_MCP/code/data/pps/cache/20251204_435962.json"
+  ]
+}

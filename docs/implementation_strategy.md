@@ -1,37 +1,38 @@
 # LH RAG MCP 서버 — 구현 전략 문서
 
-> 작성 기준일: 2026-05-30  
+> 작성 기준일: 2026-05-30 / 최종 업데이트: 2026-06-27
 > 대상 독자: 이 프로젝트를 이어서 개발하거나 유사한 RAG MCP 서버를 설계하는 개발자
 
 ---
 
 ## 1. 프로젝트 개요
 
-LH(한국토지주택공사) 임직원이 Claude Desktop/Web에서 사용하는 **법령·규정·건설기준 검색 MCP 서버**다.
+LH(한국토지주택공사) 임직원이 Claude Desktop/Web에서 사용하는 **법령·규정·건설기준·판례 검색 MCP 서버**다.
 Claude가 질문을 받으면 MCP 도구를 호출해 관련 문서 청크를 검색하고, 그 결과를 바탕으로 답변을 생성한다.
 
-### MCP 도구 4개
+### MCP 도구 6개
 
 | 도구 | 검색 대상 | 방식 |
 |---|---|---|
 | `search_law` | 국가법령·국토부 행정규칙 | 법제처 AI검색 API + admrul API |
 | `search_lh_regulations` | LH 사내 규정 | BM25 + Dense 하이브리드 RAG |
 | `search_construction_standards` | 건설기준(KDS/KCS/LHCS) | BM25 + Dense 하이브리드 RAG + 인용 그래프 1-hop 확장 |
-| `search_precedents` | 법원 판례 | 법제처 판례 API |
+| `search_precedents` | 법원 판례 | 법령앵커 + DeepInfra 리랭커 재정렬 (→ `docs/prec_law_anchor.md`) |
+| `search_procurement_interpretations` | 조달청 계약법규 해석사례 | BM25 + Dense 하이브리드 RAG |
+| `assess_construction_risk` | 건설안전 사고통계 | 백오프 집계 + lift (벡터 아님) |
 
 ---
 
 ## 2. 검색 아키텍처
 
-### 2-1. 법령·판례 — API 패스스루
-
-`search_law`와 `search_precedents`는 외부 API를 직접 호출하고 결과를 포맷해 반환한다.
-자체 인덱스가 없으므로 항상 최신 데이터를 가져오지만 API 가용성에 의존한다.
+### 2-1. 법령·판례 — API 패스스루 (+ 판례는 리랭커 재정렬)
 
 `search_law`는 법제처 AI검색(`aiSearch`) 우선, 실패 시 키워드 일반검색으로 자동 fallback한다.
-`search_precedents`는 키워드 AND 매칭이므로 결과 0건이면 첫 번째 키워드만으로 자동 재시도한다.
 
-### 2-2. LH 규정·건설기준 — 자체 하이브리드 RAG
+`search_precedents`는 **법령앵커 → 후보 수집 → 본문 조회 → DeepInfra 리랭커 재정렬** 파이프라인으로
+동작한다. 상세 설계는 `docs/prec_law_anchor.md` 참조.
+
+### 2-2. LH 규정·건설기준·조달청 해석사례 — 자체 하이브리드 RAG
 
 외부 의존 없이 로컬 인덱스(pkl 파일)로 검색한다. 검색기는 두 종류를 병렬 실행하고 RRF로 합산한다.
 
@@ -58,6 +59,13 @@ Dense (query)    ──┘
     → Dense 유사도순 정렬 후 최대 3건 추가
     → "[인용 참조: 출처조문 → 대상조문]" 태그 붙여 반환
 ```
+
+### 2-4. 건설안전 사고통계 — 통계 집계 (벡터 검색 아님)
+
+국토안전관리원 사고 CSV(37,196건, 2019~2025)를 정제해 메모리에 올린 뒤 즉석 집계한다.
+입력 `공종소분류·작업프로세스·시설물소분류`로 인적사고종류(대분류) 분포 + baseline 대비 lift를 반환.
+표본 부족 시 **백오프**(L1→L2→L3→baseline) 로 n≥20이 되는 첫 레벨을 채택한다.
+노이즈(미입력·기타·없음·분류불능)는 분자·분모에서 제외한다.
 
 ---
 
@@ -97,6 +105,32 @@ KCSC Open API (CodeList + CodeViewer)
 LH와 달리 PDF 변환 없이 공식 API JSON을 직접 사용한다.
 캐시 파일 규모: 1,822개 문서 → 41,177청크 → 17,604 인용 엣지 (2026-05 기준)
 
+### 3-3. 조달청 해석사례 파이프라인
+
+```
+법제처 OPEN API (ppsCgmExpc)
+    ↓ pps_api.py — 목록+본문 JSON, 법제처 OC 키 재사용
+    ↓ data/pps/cache/{YYYYMMDD}_{법령해석일련번호}.json  ← source of truth
+    ↓ pps_indexer.py — 데이터기준일시 비교 → 증분
+    ↓ BM25: data/pps/pps_interpretations.pkl
+       Dense: data/pps/pps_interpretations_dense.pkl
+```
+
+총 864건(2022~) 적재. 안건명+질의요지+회답+이유+관련법령 전문이 인덱싱 대상이라
+제목에 없는 표현도 의미 검색된다. 과거(2014~2021)분은 API 미제공.
+
+### 3-4. 건설안전 사고통계 파이프라인
+
+```
+국토안전관리원 CSV (cp949, 37,196건)
+    ↓ csi_indexer.py — 공종/작업/시설물/사고유형 컬럼 정제, 노이즈 필터
+    ↓ data/csi/csi_accidents.pkl  ← 정제 레코드 + baseline (런타임 메모리 로드)
+       data/csi/csi_vocab.json    ← 입력 필드별 {정식명:축약값} 어휘
+```
+
+CSV는 `data/csi/raw/`에 직접 두고 `python scripts/build_csi_index.py`로 빌드한다.
+벡터 인덱스는 없고 pandas 집계만 사용한다 (빠른 빌드, 낮은 메모리).
+
 ---
 
 ## 4. 청킹 전략
@@ -133,6 +167,11 @@ lv3/lv4 조문을 각각 청킹하면 문맥 없는 미니청크(5~200자)가 �
 인용 엣지는 lv2 헤더 노드(`KCS:142010:3.4`) 단위로 집계한다.
 lv3/lv4 자식 조문에서 발생한 인용도 모두 부모 hdr_node에 합산하므로,
 검색 시 BM25 메타의 `node_id`(hdr_node)만으로 해당 청크 전체의 인용을 조회할 수 있다.
+
+### 4-4. 조달청 해석사례 — 문서 단위 청킹 없음
+
+해석사례 1건이 곧 1청크다(안건명+질의+회답+이유+관련법령 전문). 평균 1~2KB로
+청킹 없이 단일 임베딩이 더 효과적이다.
 
 ---
 
@@ -175,7 +214,7 @@ _load_cached_date(meta)  !=  _date_prefix(meta.update_date)
 
 ## 7. 파일 경로 분리
 
-LH와 KCSC 데이터는 `data/` 하위에 명시적으로 분리한다.
+모든 데이터소스는 `data/` 하위에 명시적으로 분리한다.
 `bm25_index.py`와 `dense_index.py`에 `base_path` 파라미터를 추가해 경로를 주입받는다.
 
 ```
@@ -190,6 +229,15 @@ data/
     kcsc_standards.pkl
     kcsc_standards_dense.pkl
     kcsc_standards_graph.pkl
+  pps/                       ← PPS_DATA_PATH 환경변수
+    cache/
+      {YYYYMMDD}_{일련번호}.json
+    pps_interpretations.pkl
+    pps_interpretations_dense.pkl
+  csi/                       ← CSI_DATA_PATH 환경변수
+    raw/                     ← 원본 CSV (cp949) — 빌드 입력
+    csi_accidents.pkl
+    csi_vocab.json
 ```
 
 ---
@@ -201,11 +249,14 @@ data/
 ```python
 mcp = FastMCP(name="LH RAG MCP", instructions="...")
 
+_law_api = LawApiSource()    # 판례 법령앵커와 공유 인스턴스
 _sources = {
-    "law_api":       LawApiSource(),
-    "lh_vector_db":  LHVectorSource(),
+    "law_api":        _law_api,
+    "lh_vector_db":   LHVectorSource(),
     "kcsc_vector_db": KCSCVectorSource(),
-    "prec":          PrecedentSource(),
+    "prec":           PrecedentSource(law_api=_law_api),   # 법령앵커 주입
+    "pps_vector_db":  PpsVectorSource(),
+    "csi_stats":      CsiStatsSource(),
 }
 
 @mcp.tool()
@@ -216,11 +267,14 @@ async def search_xxx(query: str, keywords: str) -> str:
 미들웨어:
 - `ApiKeyMiddleware`: Bearer 토큰 인증 (MCP_API_KEY 미설정 시 비활성)
 - `LawOcMiddleware`: URL `?law_oc=` 파라미터를 contextvars로 요청 스코프에 주입
+- `RateLimitMiddleware`: 5분/일 버킷 요청 수 제한 + 요청/응답 크기 상한
 
 ### 서버 시작 시 사전 로딩
 
 서버 시작 시 BM25 인덱스와 Kiwi 형태소 분석기를 미리 로딩해 첫 요청 지연을 막는다.
 Dense 인덱스는 첫 검색 시 `_ensure_loaded`로 lazy 로딩한다.
+`_ensure_loaded`는 **반드시 예외를 흡수**해야 한다 — 데이터 파일 손상이 서버 전체를 크래시 루프시키면
+모든 도구가 다운된다.
 
 ---
 
@@ -232,6 +286,8 @@ Dense 인덱스는 첫 검색 시 `_ensure_loaded`로 lazy 로딩한다.
 2. `src/server.py`의 `_sources` 딕셔너리에 인스턴스 추가
 3. `@mcp.tool()` 함수 추가 (`_search_single` 호출)
 4. `SOURCE_LABELS`에 표시 이름 추가
+
+단일 파라미터 툴(예: `assess_construction_risk`)은 `_search_single`을 우회해 직접 구현 가능.
 
 ---
 
@@ -248,8 +304,10 @@ Dense 인덱스는 첫 검색 시 `_ensure_loaded`로 lazy 로딩한다.
 | **스캔 PDF** | ocrmac 미설치 시 텍스트 추출 실패 → 해당 문서 스킵 |
 | **BM25 전용 모드** | DEEPINFRA_API_KEY 미설정 시 Dense 없이 BM25만 동작 (graceful degradation) |
 | **KCSC 인용 그래프** | 그래프 pkl 없으면 1-hop 확장 비활성, 기본 하이브리드 검색으로 폴백 |
+| **판례 리랭커** | DEEPINFRA_API_KEY 없으면 어휘중첩 폴백, 법령앵커는 유지 |
+| **볼륨 업로드 주의** | flyctl sftp put은 기존 파일 덮어쓰지 않음 → 먼저 rm 후 put |
 
 ### 검색 품질 관점
 KCSC는 전문용어·코드번호 중심이라 BM25가 주 검색축이고 Dense는 recall 보강용이다.
-사용자가 `keywords`에 정확한 용어(코드명, 조문 번호, 재료명)를 넣을수록 결과가 좋아진다.
-MCP 도구 docstring에서 `query`(자연어)와 `keywords`(핵심 전문용어) 역할을 명시하는 것이 중요하다.
+판례는 법령명이 명확할수록 법령앵커 경로가 작동해 정밀도가 높아진다.
+사용자가 `keywords`에 정확한 용어(법령명, 조문번호, 코드명)를 넣을수록 결과가 좋아진다.
