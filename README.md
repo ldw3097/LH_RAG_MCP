@@ -108,7 +108,7 @@ AI와 대화할 때 질문 성격에 맞는 소스를 **자동으로 선택**하
 
 ## 📊 유용성 평가 결과
 
-MCP 연결 시 AI 답변 정확도가 **55% → 88%** 로 향상되고 응답 속도는 2배 빨라지는 것을 500개 실무 질문으로 검증했습니다.
+MCP 연결 시 AI 답변 정확도가 **55% → 94%** 로 향상되고 응답 속도는 2배 빨라지는 것을 500개 실무 질문으로 검증했습니다.
 
 → [전체 평가 보고서 보기](https://htmlpreview.github.io/?https://raw.githubusercontent.com/ldw3097/LH_RAG_MCP/main/docs/full_test_report.html)
 

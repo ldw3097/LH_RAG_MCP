@@ -203,12 +203,12 @@
       </div>
       <div class="hero-card highlight">
         <div class="hero-label">조건 B 정답률 (MCP 연결)</div>
-        <div class="hero-value">88.2%</div>
-        <div class="hero-sub">500문항 중 441개 정답</div>
+        <div class="hero-value">94.0%</div>
+        <div class="hero-sub">500문항 중 470개 정답</div>
       </div>
       <div class="hero-card">
         <div class="hero-label">MCP 연결 시 개선 폭</div>
-        <div class="hero-value" style="color:var(--teal);">+33pp</div>
+        <div class="hero-value" style="color:var(--teal);">+39pp</div>
         <div class="hero-sub">응답 속도도 2배 빠름</div>
       </div>
     </div>
@@ -231,7 +231,7 @@
         </div>
       </div>
       <div style="position:relative; height:280px;">
-        <canvas id="catAccChart" role="img" aria-label="카테고리별 정답률 비교 막대 차트. LH 규정: A=25%, B=93%. 건설기준: A=35%, B=94%. 조달청 해석사례: A=53%, B=94%. 법령: A=90%, B=96%. 판례: A=72%, B=64%.">카테고리별 정답률 비교 데이터</canvas>
+        <canvas id="catAccChart" role="img" aria-label="카테고리별 정답률 비교 막대 차트. LH 규정: A=25%, B=93%. 건설기준: A=35%, B=94%. 조달청 해석사례: A=53%, B=94%. 법령: A=90%, B=96%. 판례: A=72%, B=93%.">카테고리별 정답률 비교 데이터</canvas>
       </div>
     </div>
   </div>
@@ -311,7 +311,7 @@
 
       <div class="insight-card" style="grid-column: 1 / -1;">
         <div class="insight-header">
-          <div class="insight-icon" style="background:var(--red-light);">⚖️</div>
+          <div class="insight-icon" style="background:var(--teal-light);">⚖️</div>
           <div>
             <div class="insight-cat">판례</div>
             <div class="insight-src">법원 판결 요지·판시사항</div>
@@ -320,10 +320,10 @@
         <div class="insight-stat">
           <span class="stat-a">72%</span>
           <span class="stat-arrow">→</span>
-          <span class="stat-b" style="color:var(--red);">64%</span>
-          <span class="stat-delta delta-neg">-8pp</span>
+          <span class="stat-b" style="color:var(--teal);">93%</span>
+          <span class="stat-delta delta-pos">+21pp</span>
         </div>
-        <div class="insight-desc">유일하게 MCP가 역효과를 보인 분야. 판례 검색 API가 키워드 AND 매칭 방식이라 넓은 의미 검색에 한계가 있으며, 웹에서 접근 가능한 공개 판례와 차별화가 낮습니다. 검색 정밀도 개선이 필요합니다.</div>
+        <div class="insight-desc">다중 키워드 병렬 검색 + DeepInfra 리랭커 도입으로 판례 검색 정확도가 대폭 개선됐습니다. 기존 단순 키워드 AND 매칭 방식(64%) 대비 29pp 향상, 웹 검색 단독(72%) 대비도 21pp 높은 성능입니다. 오답은 100문항 중 0건.</div>
       </div>
 
     </div>
@@ -351,16 +351,16 @@
       <div class="verdict-card">
         <div class="verdict-cond">조건 B — MCP 연결 (500문항)</div>
         <div class="verdict-bar">
-          <div class="verdict-label"><span>정답</span><span style="color:var(--teal);">441건 (88.2%)</span></div>
-          <div class="bar-track"><div class="bar-fill" style="width:88.2%; background:var(--teal);"></div></div>
+          <div class="verdict-label"><span>정답</span><span style="color:var(--teal);">470건 (94.0%)</span></div>
+          <div class="bar-track"><div class="bar-fill" style="width:94%; background:var(--teal);"></div></div>
         </div>
         <div class="verdict-bar">
-          <div class="verdict-label"><span>부분정답</span><span style="color:var(--amber);">42건 (8.4%)</span></div>
-          <div class="bar-track"><div class="bar-fill" style="width:8.4%; background:var(--amber);"></div></div>
+          <div class="verdict-label"><span>부분정답</span><span style="color:var(--amber);">25건 (5.0%)</span></div>
+          <div class="bar-track"><div class="bar-fill" style="width:5%; background:var(--amber);"></div></div>
         </div>
         <div class="verdict-bar">
-          <div class="verdict-label"><span>오답</span><span style="color:var(--red);">17건 (3.4%)</span></div>
-          <div class="bar-track"><div class="bar-fill" style="width:3.4%; background:var(--red);"></div></div>
+          <div class="verdict-label"><span>오답</span><span style="color:var(--red);">5건 (1.0%)</span></div>
+          <div class="bar-track"><div class="bar-fill" style="width:1%; background:var(--red);"></div></div>
         </div>
       </div>
     </div>
@@ -393,16 +393,16 @@
     <div class="section-title">핵심 결론</div>
     <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px;">
       <div style="background:var(--teal-light); border-radius:var(--radius); padding:20px; border:1px solid var(--teal-mid);">
-        <div style="font-size:24px; font-weight:600; color:#085041; margin-bottom:6px;">+33pp</div>
-        <div style="font-size:13px; color:#0F6E56; line-height:1.5;"><b>정답률 향상</b><br>55% → 88%로, MCP 연결 하나로 AI 답변 신뢰도가 크게 올라갑니다.</div>
+        <div style="font-size:24px; font-weight:600; color:#085041; margin-bottom:6px;">+39pp</div>
+        <div style="font-size:13px; color:#0F6E56; line-height:1.5;"><b>정답률 향상</b><br>55% → 94%로, MCP 연결 하나로 AI 답변 신뢰도가 크게 올라갑니다.</div>
       </div>
       <div style="background:var(--blue-light); border-radius:var(--radius); padding:20px; border:1px solid #B5D4F4;">
         <div style="font-size:24px; font-weight:600; color:#0C447C; margin-bottom:6px;">2배 빠름</div>
         <div style="font-size:13px; color:#185FA5; line-height:1.5;"><b>응답 속도</b><br>평균 18.7초 → 9.3초. 정확도와 속도를 동시에 개선합니다.</div>
       </div>
-      <div style="background:var(--amber-light); border-radius:var(--radius); padding:20px; border:1px solid #FAC775;">
-        <div style="font-size:24px; font-weight:600; color:#633806; margin-bottom:6px;">판례 개선 필요</div>
-        <div style="font-size:13px; color:#854F0B; line-height:1.5;"><b>유일한 역효과</b><br>판례 검색 정밀도를 높이면 전체 성능이 추가로 향상될 여지가 있습니다.</div>
+      <div style="background:var(--teal-light); border-radius:var(--radius); padding:20px; border:1px solid var(--teal-mid);">
+        <div style="font-size:24px; font-weight:600; color:#085041; margin-bottom:6px;">오답 1%</div>
+        <div style="font-size:13px; color:#0F6E56; line-height:1.5;"><b>오류 최소화</b><br>MCP 연결 시 500문항 중 오답 5건(1%)만 발생. 판례 오답은 0건입니다.</div>
       </div>
     </div>
   </div>
@@ -427,7 +427,7 @@
 const catLabels = ['LH 사내 규정','건설기준','조달청\n해석사례','법령','판례'];
 const catLabelsWrap = [['LH','사내 규정'],['건설기준'],['조달청','해석사례'],['법령'],['판례']];
 const accA = [25, 35, 53, 90, 72];
-const accB = [93, 94, 94, 96, 64];
+const accB = [93, 94, 94, 96, 93];
 const durA = [21.9, 31.0, 13.1, 12.0, 15.3];
 const durB = [10.0, 7.6, 11.8, 3.3, 13.7];
 
