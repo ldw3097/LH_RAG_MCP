@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/Users/ldw/code/LH_RAG_MCP/code/.codex/hooks/session-start.sh'"
+          }
+        ]
+      }
+    ]
+  }
+}

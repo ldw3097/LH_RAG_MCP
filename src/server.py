@@ -8,6 +8,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
+from src.actions import register_action_routes
 from src.config import settings
 from src.context import law_oc_var
 from src.sources.law_api import LawApiSource
@@ -524,6 +525,19 @@ def main():
     logger.info("BM25 인덱스 사전 로딩 완료")
 
     app = mcp.http_app(transport="streamable-http")
+    register_action_routes(
+        app,
+        {
+            "search_law": search_law,
+            "search_lh_regulations": search_lh_regulations,
+            "search_construction_standards": search_construction_standards,
+            "search_precedents": search_precedents,
+            "search_procurement_interpretations": search_procurement_interpretations,
+            "assess_construction_risk": assess_construction_risk,
+            "get_law_article": get_law_article,
+            "get_admrul_article": get_admrul_article,
+        },
+    )
     # 미들웨어는 역순으로 실행되므로 안쪽부터 등록
     # 실행 순서: MaxBodySize → RateLimit → ApiKey → LawOc → 툴
     app.add_middleware(LawOcMiddleware)

@@ -1,0 +1,6 @@
+[mcp_servers.lh-rag-local]
+command = "/Users/ldw/code/LH_RAG_MCP/code/.venv/bin/python"
+args = [
+    "-m",
+    "src.server_local",
+]
