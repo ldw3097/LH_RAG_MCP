@@ -103,7 +103,8 @@ assess_construction_risk(공종소,작업,시설소)   → 건설안전 사고�
 | `scripts/build_csi_index.py` | 건설안전 사고통계 빌드 엔트리포인트 (`--source`, `--limit`, `--force`) |
 | `docs/gpts-actions-openapi.yaml` | GPT Builder Actions에 붙여넣는 OpenAPI 3.1 스키마 |
 | `docs/gpts-instructions.md` | Custom GPT Instructions 초안 |
-| `docs/privacy.md` | 공개 GPT용 개인정보 처리방침 초안 |
+| `docs/privacy.md` | 공개 GPT용 개인정보 처리방침 원문 |
+| `docs/privacy.html` | htmlpreview.github.io로 연결할 공개 GPT용 개인정보 처리방침 HTML |
 | `docs/lh-rag-gpt-profile.png` | GPTs 프로필 이미지 |
 
 ## 새 소스 추가
@@ -182,9 +183,14 @@ GPTs 공개 관련 문서:
 docs/
   gpts-actions-openapi.yaml  ← GPT Builder Actions 스키마
   gpts-instructions.md       ← GPT Instructions 초안
-  privacy.md                 ← Privacy Policy URL로 사용할 개인정보 처리방침
+  privacy.md                 ← 개인정보 처리방침 원문
+  privacy.html               ← Privacy Policy URL용 HTML
   lh-rag-gpt-profile.png     ← GPT 프로필 이미지
 ```
+
+Privacy Policy URL은 GitHub push 후 아래 형식을 사용한다:
+
+`https://htmlpreview.github.io/?https://raw.githubusercontent.com/ldw3097/LH_RAG_MCP/main/docs/privacy.html`
 
 KCSC 청킹: lv1/lv2 헤더를 경계로 하위 섹션(lv3/lv4)을 합산. 60자 미만 그룹은 다음 그룹에 병합.
 KCSC 증분: `cache/` 파일명 날짜(`YYYYMMDD`) ↔ API `updateDate` 비교로 변경분만 크롤.
