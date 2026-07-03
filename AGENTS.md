@@ -1,7 +1,10 @@
 # CLAUDE.md — LH RAG MCP 프로젝트 컨텍스트
 
 LH(한국토지주택공사) 임직원용 법령·규정 RAG MCP 서버. Claude Desktop/Web에 연결해 사용한다.
-배포 주소: `https://lh-rag-mcp.fly.dev/mcp`
+GPTs Actions 공개용 REST 래퍼도 함께 제공한다.
+배포 주소:
+- MCP: `https://lh-rag-mcp.fly.dev/mcp`
+- GPTs Actions REST: `https://lh-rag-mcp.fly.dev/actions/...`
 
 ## 빠른 실행
 
@@ -44,6 +47,9 @@ assess_construction_risk(공종소,작업,시설소)   → 건설안전 사고�
 ```
 
 - MCP 도구 6개. Claude가 질문 성격에 맞게 선택(또는 여러 개 호출)한다.
+- GPTs Actions REST 래퍼는 `src/actions.py`에서 Starlette `Route`로 제공한다.
+  `src/server.py`의 기존 MCP 툴 함수를 handler로 주입받아 재사용하므로 검색·포맷팅 로직을 중복 구현하지 않는다.
+  응답은 `{ "result": "..." }` JSON 형태다.
 - `search_law`/`search_lh_regulations`/`search_construction_standards`는 `query`(자연어 — AI검색·Dense)와 `keywords`(키워드 — 일반검색·BM25·admrul)를 받는다.
 - `search_law`: ① aiSearch `search=0`(법령조문)·`search=2`(행정규칙조문) 각 5건 병렬 → 조문 블록(최대 10건).
   ② keywords에서 비법령명어(`NON_LAW_NAME_RE`) 제거본·원본을 병렬 법령 일반검색 → 합집합 → `score_law_relevance` 재정렬 → 상위 10건 본문 조회(300자) → 법령 블록.
@@ -69,6 +75,7 @@ assess_construction_risk(공종소,작업,시설소)   → 건설안전 사고�
 | 파일 | 역할 |
 |---|---|
 | `src/server.py` | FastMCP 앱, 미들웨어, `search_law`·`search_lh_regulations`·`search_construction_standards`·`search_precedents`·`search_procurement_interpretations`·`assess_construction_risk` 툴 |
+| `src/actions.py` | GPTs Actions용 REST 라우트. `server.py`의 MCP 툴 함수를 handler로 주입받아 재사용 |
 | `src/config.py` | 환경변수 (pydantic-settings) |
 | `src/context.py` | `law_oc_var` — 요청별 법제처 API 키 격리 (contextvars) |
 | `src/sources/law_normalize.py` | `NON_LAW_NAME_RE`·`strip_non_law_keywords`·`score_law_relevance` — 비법령명어 제거·정확매칭 점수 |
@@ -94,6 +101,10 @@ assess_construction_risk(공종소,작업,시설소)   → 건설안전 사고�
 | `scripts/build_kcsc_index.py` | KCSC 인덱스 빌드 엔트리포인트 (`--type`, `--limit`, `--from-cache`, `--force`) |
 | `scripts/build_pps_index.py` | 조달청 해석사례 인덱스 빌드 엔트리포인트 (`--limit`, `--from-cache`, `--force`) |
 | `scripts/build_csi_index.py` | 건설안전 사고통계 빌드 엔트리포인트 (`--source`, `--limit`, `--force`) |
+| `docs/gpts-actions-openapi.yaml` | GPT Builder Actions에 붙여넣는 OpenAPI 3.1 스키마 |
+| `docs/gpts-instructions.md` | Custom GPT Instructions 초안 |
+| `docs/privacy.md` | 공개 GPT용 개인정보 처리방침 초안 |
+| `docs/lh-rag-gpt-profile.png` | GPTs 프로필 이미지 |
 
 ## 새 소스 추가
 
@@ -101,6 +112,8 @@ assess_construction_risk(공종소,작업,시설소)   → 건설안전 사고�
 2. `src/server.py` `_sources` 딕셔너리에 인스턴스 추가
 3. `src/server.py` 에 `@mcp.tool()` 함수 추가 (`_search_single(source_id, query, keywords)` 호출)
    - 단일 파라미터 툴은 `_search_single`을 우회해 직접 호출 가능 (예: `search_precedents`는 `keywords`만 받음)
+4. GPTs Actions에도 노출할 경우 `src/actions.py`에 `/actions/...` 라우트를 추가하고,
+   `docs/gpts-actions-openapi.yaml` 스키마와 `docs/gpts-instructions.md` 도구 설명을 함께 갱신한다.
 
 ## 테스트
 
@@ -112,6 +125,18 @@ npx @modelcontextprotocol/inspector python -m src.server
 
 배포 서버 대상 엔드투엔드 테스트는 `https://lh-rag-mcp.fly.dev/mcp?law_oc=<키>` 에
 streamable-http(JSON-RPC)로 `initialize` → `tools/list` → `tools/call` 순으로 호출한다.
+
+GPTs Actions REST 테스트는 배포 서버에 JSON POST로 호출한다:
+
+```bash
+curl -s https://lh-rag-mcp.fly.dev/actions/search_lh_regulations \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"LH 직원 연차 휴가 사용 기준","keywords":"연차 휴가 복무"}'
+```
+
+필수 필드 누락 시 `400 {"error": "Missing required field: ..."}` 형태로 응답한다.
+`MCP_API_KEY`가 설정되면 REST와 MCP 모두 `Authorization: Bearer <key>` 인증이 필요하다.
+현재 공개 배포는 인증 없이 호출 가능하도록 운영한다.
 
 ## 환경변수 (.env)
 
@@ -149,6 +174,16 @@ data/
     csi_accidents.pkl         ← 정제 레코드 + baseline (런타임 메모리 로드)
     csi_vocab.json            ← 입력 필드별 {정식명:축약값} 어휘 (도구 설명·입력 해석)
 docs/  ← 구현 전략, 참고할 지식
+```
+
+GPTs 공개 관련 문서:
+
+```
+docs/
+  gpts-actions-openapi.yaml  ← GPT Builder Actions 스키마
+  gpts-instructions.md       ← GPT Instructions 초안
+  privacy.md                 ← Privacy Policy URL로 사용할 개인정보 처리방침
+  lh-rag-gpt-profile.png     ← GPT 프로필 이미지
 ```
 
 KCSC 청킹: lv1/lv2 헤더를 경계로 하위 섹션(lv3/lv4)을 합산. 60자 미만 그룹은 다음 그룹에 병합.

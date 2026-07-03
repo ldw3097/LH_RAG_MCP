@@ -42,6 +42,36 @@ AI와 대화할 때 질문 성격에 맞는 소스를 **자동으로 선택**하
 
 ---
 
+## 🤖 GPTs Actions 연결
+
+Custom GPT 공개용으로 GPTs Actions REST API도 함께 제공합니다.
+
+| 항목 | 값 |
+| --- | --- |
+| **Actions API Base URL** | `https://lh-rag-mcp.fly.dev` |
+| **OpenAPI 스키마** | [`docs/gpts-actions-openapi.yaml`](docs/gpts-actions-openapi.yaml) |
+| **GPT Instructions 초안** | [`docs/gpts-instructions.md`](docs/gpts-instructions.md) |
+| **개인정보 처리방침** | [`docs/privacy.md`](docs/privacy.md) |
+| **프로필 이미지** | [`docs/lh-rag-gpt-profile.png`](docs/lh-rag-gpt-profile.png) |
+| **인증** | 현재 공개 배포는 인증 없음 |
+
+GPT Builder의 **Configure → Actions**에서 `docs/gpts-actions-openapi.yaml` 내용을 붙여넣으면 아래 REST 엔드포인트를 호출합니다.
+
+```text
+POST /actions/search_law
+POST /actions/search_lh_regulations
+POST /actions/search_construction_standards
+POST /actions/search_precedents
+POST /actions/search_procurement_interpretations
+POST /actions/assess_construction_risk
+POST /actions/get_law_article
+POST /actions/get_admrul_article
+```
+
+> 공개 GPT의 Privacy Policy URL에는 GitHub에 push된 `docs/privacy.md`의 공개 URL을 사용하세요.
+
+---
+
 ## 💬 예시 질문
 
 ### 🏛️ 국가법령·행정규칙 관련 예시 (search_law)
@@ -78,11 +108,12 @@ AI와 대화할 때 질문 성격에 맞는 소스를 **자동으로 선택**하
 
 ## 🔐 보안 유의사항
 
-- MCP 툴 호출이 발생하면 **Claude가 요약한 질의가 개발자의 MCP 서버(`lh-rag-mcp.fly.dev`)로 전송됩니다.**
+- MCP 또는 GPTs Actions 툴 호출이 발생하면 **AI가 요약한 질의가 개발자의 서버(`lh-rag-mcp.fly.dev`)로 전송됩니다.**
 - MCP 서버는 임베딩값 추출을 위해 요약된 질의를 오픈소스 LLM 서빙 서비스인 `deepinfra`로 전송합니다.
 - 응답이 완료되면 모든 입력값은 개발자의 서버에서 즉시 삭제됩니다.
 - **기밀 정보나 개인정보가 포함된 질문을 MCP 서버로 넘기지 않도록 주의하세요.**
 - **이 MCP 툴을 사용하지 않을경우, Claude 커넥터 설정에서 '차단됨'으로 변경하는것을 권장드립니다.**
+- 공개 GPT 개인정보 처리방침은 [`docs/privacy.md`](docs/privacy.md)를 참고하세요.
 
 ---
 

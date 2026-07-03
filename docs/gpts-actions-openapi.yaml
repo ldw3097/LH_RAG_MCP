@@ -1,0 +1,370 @@
+openapi: 3.1.0
+info:
+  title: LH RAG Actions API
+  version: 1.0.0
+  description: >
+    LH RAG search actions for Korean laws, LH internal regulations,
+    construction standards, precedents, procurement interpretations, and
+    construction accident risk statistics.
+servers:
+  - url: https://lh-rag-mcp.fly.dev
+security:
+  - bearerAuth: []
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  schemas:
+    TextResult:
+      type: object
+      required:
+        - result
+      properties:
+        result:
+          type: string
+          description: Search or lookup result text. Use this as the factual basis for the answer.
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+paths:
+  /actions/search_law:
+    post:
+      operationId: searchLaw
+      summary: Search Korean laws and administrative rules
+      description: >
+        Use for questions about Korean statutes, enforcement decrees, enforcement rules,
+        legal articles, notices, directives, and administrative rules. Call this before
+        answering law or administrative-rule questions.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - query
+                - keywords
+              properties:
+                query:
+                  type: string
+                  description: Natural-language summary of the user's question.
+                keywords:
+                  type: string
+                  description: Core Korean search keywords separated by spaces.
+            example:
+              query: 공공주택 분양가 산정 기준
+              keywords: 공공주택 분양가 산정
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TextResult"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /actions/search_lh_regulations:
+    post:
+      operationId: searchLHRegulations
+      summary: Search LH internal regulations
+      description: >
+        Use for LH internal rules, bylaws, personnel, pay, organization,
+        audit, security, work procedures, and employee-facing policy questions.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - query
+                - keywords
+              properties:
+                query:
+                  type: string
+                  description: Natural-language summary of the user's question.
+                keywords:
+                  type: string
+                  description: Core Korean search keywords separated by spaces.
+            example:
+              query: LH 직원 연차 휴가 사용 기준
+              keywords: 연차 휴가 복무
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TextResult"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /actions/search_construction_standards:
+    post:
+      operationId: searchConstructionStandards
+      summary: Search KDS, KCS, and LHCS construction standards
+      description: >
+        Use for engineering, design, construction, material, quality, safety factor,
+        load, method, or specification questions involving KDS, KCS, or LHCS standards.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - query
+                - keywords
+              properties:
+                query:
+                  type: string
+                  description: Natural-language summary of the user's question.
+                keywords:
+                  type: string
+                  description: Core Korean search keywords separated by spaces.
+                category:
+                  type: string
+                  enum:
+                    - all
+                    - design
+                    - construction
+                  default: all
+                  description: >
+                    all searches every standard. design searches KDS only.
+                    construction searches KCS and LHCS only.
+            example:
+              query: 콘크리트 압축강도 시험방법 및 기준
+              keywords: 콘크리트 압축강도 시험
+              category: construction
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TextResult"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /actions/search_precedents:
+    post:
+      operationId: searchPrecedents
+      summary: Search Korean court precedents
+      description: >
+        Use when the user asks about court precedents, case law, judicial holdings,
+        dispute outcomes, or whether a legal issue has relevant cases. Provide law_name
+        or keywords, and prefer concise issue keywords.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - query
+              properties:
+                query:
+                  type: string
+                  description: Natural-language summary of the user's precedent question.
+                law_name:
+                  type: string
+                  description: Formal Korean law name, if known.
+                keywords:
+                  type: string
+                  description: Core issue keywords. At least one of law_name or keywords is required.
+            example:
+              query: 분양가 상한제 관련 위헌 판례가 있는지
+              law_name: ""
+              keywords: 분양가상한제 위헌
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TextResult"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /actions/search_procurement_interpretations:
+    post:
+      operationId: searchProcurementInterpretations
+      summary: Search PPS procurement contract interpretations
+      description: >
+        Use for Public Procurement Service contract-law interpretations, national
+        contract regulations, bidding, awardee selection, contract management,
+        price adjustment, and defect liability questions.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - query
+                - keywords
+              properties:
+                query:
+                  type: string
+                  description: Natural-language summary of the user's question.
+                keywords:
+                  type: string
+                  description: Core Korean search keywords separated by spaces.
+            example:
+              query: 물가변동으로 계약금액을 조정할 수 있는지
+              keywords: 물가변동 계약금액 조정
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TextResult"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /actions/assess_construction_risk:
+    post:
+      operationId: assessConstructionRisk
+      summary: Assess likely construction accident types from historical statistics
+      description: >
+        Use when the user describes a planned construction task and asks about
+        likely accident types or safety risk patterns. This is a statistical
+        lookup, not BM25 or vector search.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - work_process
+              properties:
+                work_process:
+                  type: string
+                  description: Construction work process. Must match the CSI vocabulary as closely as possible.
+                work_subtype:
+                  type: string
+                  description: Optional construction work subtype.
+                facility_subtype:
+                  type: string
+                  description: Optional facility subtype.
+            example:
+              work_process: 거푸집 설치
+              work_subtype: 철근콘크리트공사
+              facility_subtype: 공동주택
+      responses:
+        "200":
+          description: Statistical risk result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TextResult"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /actions/get_law_article:
+    post:
+      operationId: getLawArticle
+      summary: Get the full text of a specific law article
+      description: >
+        Use after searchLaw when the user needs the full text of a specific statute article.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - law_name
+                - article
+              properties:
+                law_name:
+                  type: string
+                  description: Formal Korean law name.
+                article:
+                  type: string
+                  description: Article identifier such as 제3조 or 제7조의2.
+            example:
+              law_name: 주택임대차보호법
+              article: 제3조
+      responses:
+        "200":
+          description: Article text
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TextResult"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /actions/get_admrul_article:
+    post:
+      operationId: getAdmrulArticle
+      summary: Get the full text of a specific administrative-rule article
+      description: >
+        Use after searchLaw when the user needs the full text of a specific
+        notice, directive, established rule, or administrative-rule article.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - admrul_name
+                - article
+              properties:
+                admrul_name:
+                  type: string
+                  description: Administrative-rule name.
+                article:
+                  type: string
+                  description: Article identifier such as 제5조 or 제7조의2.
+                ministry:
+                  type: string
+                  description: Optional ministry name to narrow the lookup.
+            example:
+              admrul_name: 공공주택 업무처리지침
+              article: 제5조
+              ministry: 국토교통부
+      responses:
+        "200":
+          description: Article text
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TextResult"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
