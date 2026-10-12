@@ -253,5 +253,9 @@ OCR 엔진: `ocrmac`(macOS, 한국어 우수) → RapidOCR(폴백). `pip install
   **주의**: `flyctl sftp put`은 **기존 파일을 덮어쓰지 않는다**. 재업로드 시 먼저
   `fly ssh console -C "rm -f <원격>"`로 지운 뒤 put. (작은 파일이 0바이트로 올라가는
   사례가 있으니 `sftp get`으로 크기 검증 권장.)
+- **업무시간 상시 가동**: `.github/workflows/fly-business-hours.yml`이 평일 08:40 KST에 머신을
+  `--autostop=off`로 켜두고, 18:00 KST에 `--autostop=suspend`로 되돌린다. 수동 실행(workflow_dispatch)도 가능.
+  GitHub secret `FLY_API_TOKEN`은 앱 범위 deploy 토큰(1년 만료) — 앱을 재생성하면 토큰도 다시 발급해야 한다.
+  `fly deploy`를 하면 fly.toml 설정(suspend)으로 돌아가므로 업무시간 중 배포 후엔 워크플로를 `on`으로 수동 실행.
 - 소스 로드(`_ensure_loaded`)는 **반드시 예외를 흡수**할 것 — 데이터 파일 손상이 서버 전체를
   크래시 루프시키면 모든 도구가 다운된다 (csi_stats가 그렇게 당함).
