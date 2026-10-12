@@ -1,0 +1,50 @@
+# 평일 업무시간(09~18시 KST)에는 fly.io 머신을 항상 켜두고, 그 외 시간엔 idle 시 일시정지한다.
+# GitHub cron은 수 분~수십 분 지연될 수 있어 켜기는 08:40에 예약한다.
+name: fly business hours
+
+on:
+  schedule:
+    - cron: "40 23 * * 0-4"   # 월~금 08:40 KST → 상시 켜짐
+    - cron: "0 9 * * 1-5"     # 월~금 18:00 KST → idle 시 suspend
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "on = 상시 켜짐, off = idle 시 suspend"
+        required: true
+        type: choice
+        options: [on, off]
+
+env:
+  APP: lh-rag-mcp
+
+jobs:
+  toggle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Decide mode
+        id: mode
+        run: |
+          if [ -n "${{ inputs.mode }}" ]; then
+            echo "mode=${{ inputs.mode }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event.schedule }}" = "40 23 * * 0-4" ]; then
+            echo "mode=on" >> "$GITHUB_OUTPUT"
+          else
+            echo "mode=off" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Update machines
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          ids=$(flyctl machines list -a "$APP" --json | jq -r '.[].id')
+          for id in $ids; do
+            if [ "${{ steps.mode.outputs.mode }}" = "on" ]; then
+              flyctl machine update "$id" -a "$APP" --autostop=off --yes
+              flyctl machine start "$id" -a "$APP" || true
+            else
+              flyctl machine update "$id" -a "$APP" --autostop=suspend --yes
+            fi
+          done
+          flyctl machines list -a "$APP"
