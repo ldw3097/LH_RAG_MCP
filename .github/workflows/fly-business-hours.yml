@@ -12,7 +12,7 @@ on:
         description: "on = 상시 켜짐, off = idle 시 suspend"
         required: true
         type: choice
-        options: [on, off]
+        options: ["on", "off"]
 
 env:
   APP: lh-rag-mcp
